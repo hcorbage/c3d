@@ -78,6 +78,19 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       intersectionsResolved: 0,
     };
 
+    // ── Resolve intersections FIRST, before any vertex merging ──────────────
+    // Must run on original topology so findShells() can distinguish separate
+    // shells. Running removeDuplicates first can merge boundary vertices and
+    // collapse multiple shells into one, making resolveIntersections a no-op.
+    // Also: we must NOT re-fill holes after resolving — those boundary holes
+    // are the clean separators BambuLab needs for per-shell painting.
+    if (shouldResolveIntersections) {
+      const result = resolveIntersections(triangles);
+      fixes.intersectionsResolved = result.resolved;
+      triangles = result.triangles;
+      console.log(`[resolveIntersections] removed ${result.resolved} hidden triangles`);
+    }
+
     if (shouldRemoveDuplicates) {
       const result = removeDuplicatesAndDegenerate(triangles);
       fixes.duplicatesRemoved = result.removedDuplicates;
@@ -100,25 +113,13 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     if (shouldFixNormals) {
       const before = triangles.length;
       triangles = fixNormals(triangles);
-      fixes.normalsFixed = before; // all normals recalculated
+      fixes.normalsFixed = before;
     }
 
     if (shouldDecimate) {
       const result = decimateMesh(triangles, 1 - decimateRatio);
       fixes.trianglesReduced = result.trianglesRemoved;
       triangles = result.triangles;
-    }
-
-    if (shouldResolveIntersections) {
-      const result = resolveIntersections(triangles);
-      fixes.intersectionsResolved = result.resolved;
-      triangles = result.triangles;
-      // Re-fill holes created by the intersection removal
-      if (result.resolved > 0) {
-        const refill = fillHoles(triangles, maxHoleSize);
-        fixes.holesFilled += refill.holesFilled;
-        triangles = refill.triangles;
-      }
     }
 
     if (smoothingIterations > 0) {
