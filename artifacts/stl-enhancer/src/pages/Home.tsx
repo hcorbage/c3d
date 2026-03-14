@@ -3,7 +3,7 @@ import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Upload, Box, Zap, Settings2, Download, 
-  Activity, Info, Layers, Maximize, AlertCircle, Eye, EyeOff, ShieldCheck,
+  Activity, Info, Layers, Maximize, AlertCircle, CheckCircle2, Eye, EyeOff, ShieldCheck,
   LogIn, LogOut, User, CreditCard, GitMerge, Scissors
 } from "lucide-react";
 import { useEnhanceStl, useGetStlStats } from "@workspace/api-client-react";
@@ -659,9 +659,22 @@ export default function Home() {
                       </Label>
                       <p className="text-xs text-muted-foreground">{t.options.mergeShellsDesc}</p>
                     </div>
-                    <Switch id="merge-shells" checked={mergeShells} onCheckedChange={setMergeShells} />
+                    <Switch
+                      id="merge-shells"
+                      checked={mergeShells}
+                      disabled={resolveIntersections}
+                      onCheckedChange={(v) => {
+                        setMergeShells(v);
+                        if (v) setResolveIntersections(false);
+                      }}
+                    />
                   </div>
-                  {stats && stats.shellCount > 1 && (
+                  {resolveIntersections ? (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-400 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      {t.options.mergeShellsConflict}
+                    </div>
+                  ) : stats && stats.shellCount > 1 && (
                     <div className="mt-3 flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-xl px-3 py-2">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       {t.options.mergeShellsWarning}
@@ -713,9 +726,22 @@ export default function Home() {
                     {t.options.resolveIntersections}
                     <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="orange" />
                   </Label>
-                  <Switch id="resolve-intersections" checked={resolveIntersections} onCheckedChange={setResolveIntersections} />
+                  <Switch
+                    id="resolve-intersections"
+                    checked={resolveIntersections}
+                    onCheckedChange={(v) => {
+                      setResolveIntersections(v);
+                      if (v) setMergeShells(false);
+                    }}
+                  />
                 </div>
                 <p className="text-xs text-muted-foreground">{t.options.resolveIntersectionsDesc}</p>
+                {stats && stats.shellCount > 1 && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-green-400 bg-green-400/10 border border-green-400/20 rounded-xl px-3 py-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    {t.options.resolveIntersectionsHint}
+                  </div>
+                )}
               </div>
 
             </div>
