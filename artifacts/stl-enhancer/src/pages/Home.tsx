@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -153,6 +153,34 @@ export default function Home() {
       }
     }
   });
+
+  // Simulated progress bar — lives after enhanceMutation so the ref is valid
+  const [progress, setProgress] = useState(0);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (enhanceMutation.isPending) {
+      setProgress(0);
+      progressTimer.current = setInterval(() => {
+        setProgress((p) => {
+          const step = p < 30 ? 3 : p < 60 ? 1.8 : p < 80 ? 0.7 : 0.15;
+          return Math.min(89, p + step);
+        });
+      }, 120);
+    } else {
+      if (progressTimer.current) {
+        clearInterval(progressTimer.current);
+        progressTimer.current = null;
+      }
+      if (progress > 0) {
+        setProgress(100);
+        setTimeout(() => setProgress(0), 700);
+      }
+    }
+    return () => {
+      if (progressTimer.current) clearInterval(progressTimer.current);
+    };
+  }, [enhanceMutation.isPending]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
@@ -340,6 +368,7 @@ export default function Home() {
                   onClick={() => setIsWireframe(!isWireframe)}
                   className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-secondary transition-colors text-foreground shadow-lg"
                   title={t.viewer.toggleWireframe}
+                  disabled={enhanceMutation.isPending}
                 >
                   {isWireframe ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -347,23 +376,56 @@ export default function Home() {
                   {...getRootProps()}
                   className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-secondary transition-colors text-foreground shadow-lg"
                   title={t.viewer.uploadNew}
+                  disabled={enhanceMutation.isPending}
                 >
                   <input {...getInputProps()} />
                   <Upload className="w-5 h-5" />
                 </button>
               </div>
+
+              {/* Processing overlay */}
+              <AnimatePresence>
+                {enhanceMutation.isPending && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm rounded-3xl gap-4"
+                  >
+                    <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-foreground">{t.actions.processing}</p>
+                      <p className="text-2xl font-mono font-bold text-primary mt-1">{Math.round(progress)}%</p>
+                    </div>
+                    {/* Mini progress bar */}
+                    <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-[width] duration-150 ease-linear"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <StlViewer fileUrl={fileUrl} wireframe={isWireframe} />
             </motion.div>
           )}
 
           {file && enhancedFileUrl && (
             <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              key="enhanced-viewer"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
               className="flex-1 flex flex-col gap-3"
             >
-              {/* Barra de controles */}
+              {/* Controls bar */}
               <div className="flex items-center justify-between px-1">
-                <p className="text-xs text-muted-foreground">{t.viewer.compareHint}</p>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <p className="text-xs font-medium text-green-400">{t.viewer.enhanced}</p>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setIsWireframe(!isWireframe)}
@@ -383,24 +445,14 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Dois visualizadores lado a lado */}
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-[400px]">
-                <div className="glass-panel rounded-2xl overflow-hidden">
-                  <StlViewer
-                    fileUrl={fileUrl}
-                    wireframe={isWireframe}
-                    label={t.viewer.original}
-                    labelColor="blue"
-                  />
-                </div>
-                <div className="glass-panel rounded-2xl overflow-hidden">
-                  <StlViewer
-                    fileUrl={enhancedFileUrl}
-                    wireframe={isWireframe}
-                    label={t.viewer.enhanced}
-                    labelColor="green"
-                  />
-                </div>
+              {/* Enhanced model only — full width */}
+              <div className="flex-1 glass-panel rounded-2xl overflow-hidden min-h-[400px]">
+                <StlViewer
+                  fileUrl={enhancedFileUrl}
+                  wireframe={isWireframe}
+                  label={t.viewer.enhanced}
+                  labelColor="green"
+                />
               </div>
             </motion.div>
           )}
@@ -698,24 +750,39 @@ export default function Home() {
                   onClick={handleEnhance}
                   disabled={!file || enhanceMutation.isPending || statsMutation.isPending}
                   className={`
-                    w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2
+                    w-full py-4 rounded-2xl font-display font-bold text-lg
                     transition-all duration-300 relative overflow-hidden
-                    ${(!file || enhanceMutation.isPending) 
-                      ? 'bg-secondary text-muted-foreground cursor-not-allowed' 
+                    ${(!file || enhanceMutation.isPending)
+                      ? 'bg-secondary text-muted-foreground cursor-not-allowed'
                       : 'bg-primary text-primary-foreground hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)] hover:-translate-y-1 active:translate-y-0'}
                   `}
                 >
-                  {enhanceMutation.isPending ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      {t.actions.processing}
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-5 h-5" />
-                      {t.actions.enhance}
-                    </>
+                  {/* Progress fill layer */}
+                  {progress > 0 && (
+                    <span
+                      className="absolute inset-y-0 left-0 bg-white/15 transition-[width] duration-150 ease-linear"
+                      style={{ width: `${progress}%` }}
+                    />
                   )}
+                  {/* Button label */}
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    {enhanceMutation.isPending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        {t.actions.processing} {Math.round(progress)}%
+                      </>
+                    ) : progress === 100 ? (
+                      <>
+                        <Download className="w-5 h-5" />
+                        {t.actions.enhance}
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5" />
+                        {t.actions.enhance}
+                      </>
+                    )}
+                  </span>
                 </button>
               </div>
             )}
