@@ -90,6 +90,7 @@ export const translations = {
       shellsMerged: "shells merged",
       intersectionsResolved: "internal faces removed",
       noIssues: "No issues found — mesh was already clean!",
+      mergedShellWarning: "⚠ This model's parts are merged into one solid mesh. \"Resolve Intersections\" only works when parts are separate overlapping shells. To separate merged parts automatically, use Blender (Edit Mode → Separate → By Loose Parts) or a mesh repair tool.",
     },
     actions: {
       enhance: "Enhance & Download",
@@ -234,6 +235,7 @@ export const translations = {
       shellsMerged: "cascas mescladas",
       intersectionsResolved: "faces internas removidas",
       noIssues: "Nenhum problema encontrado — a malha já estava limpa!",
+      mergedShellWarning: "⚠ As partes deste modelo estão fundidas em uma única malha sólida. \"Resolver Interseções\" só funciona quando as partes são cascas sobrepostas separadas. Para separar partes fundidas automaticamente, use Blender (Edit Mode → Separate → By Loose Parts) ou outra ferramenta de reparo de malha.",
     },
     actions: {
       enhance: "Melhorar & Baixar",

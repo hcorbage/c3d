@@ -47,7 +47,10 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     const shouldSplitShells = req.body.splitShells === "true";
     const shouldSmoothSeams = req.body.smoothSeams === "true";
     const decimateRatio = Math.min(0.95, Math.max(0.05, parseFloat(req.body.decimateRatio ?? "0.5") || 0.5));
-    const maxHoleSize = Math.min(5000, Math.max(3, parseInt(req.body.maxHoleSize ?? "500", 10) || 500));
+    // Keep maxHoleSize conservative: filling large holes (wings, mouths, sockets)
+    // with flat polygon caps creates visible flat black patches in slicers.
+    // Default = 30 edges; capped at 200 to avoid destroying open-body models.
+    const maxHoleSize = Math.min(200, Math.max(3, parseInt(req.body.maxHoleSize ?? "30", 10) || 30));
     const smoothingIterations = Math.min(20, Math.max(0, parseInt(req.body.smoothingIterations ?? "3", 10) || 0));
 
     // Credit cost
@@ -162,6 +165,18 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       });
     }
 
+    // Detect merged-shell warning: one shell holds ≥ 90% of all triangles.
+    // Resolve Intersections can only separate geometrically DISTINCT overlapping
+    // shells (e.g., ring placed inside sphere). If parts are welded into one mesh,
+    // it cannot help — user must use Blender / MeshLab to split manually.
+    const totalTrisForWarning = triangles.length;
+    const { shells: shellsForWarning } = detectShells(triangles);
+    const largestShellFraction =
+      totalTrisForWarning > 0
+        ? (shellsForWarning.reduce((m, s) => Math.max(m, s.length), 0) / totalTrisForWarning)
+        : 0;
+    const mergedShellWarning = largestShellFraction >= 0.9 && shellsForWarning.length > 0;
+
     // Build quality report
     const qualityReport = {
       before: {
@@ -173,6 +188,7 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
         degenerates: beforeStats.degenerateTriangles,
         isManifold: beforeStats.isManifold,
         unitWarning: beforeStats.unitWarning,
+        mergedShellWarning,
         dimensions: {
           x: +(beforeStats.boundingBox.maxX - beforeStats.boundingBox.minX).toFixed(2),
           y: +(beforeStats.boundingBox.maxY - beforeStats.boundingBox.minY).toFixed(2),

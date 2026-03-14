@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle2, AlertTriangle, TrendingDown, GitMerge, Shield, Minus, Layers } from "lucide-react";
+import { CheckCircle2, AlertTriangle, TrendingDown, GitMerge, Shield, Minus, Layers, Info } from "lucide-react";
 import type { QualityReport } from "@workspace/api-client-react";
 import { useLanguage } from "@/i18n/LanguageContext";
 
@@ -105,6 +105,16 @@ export function QualityReportPanel({ report }: Props) {
           </div>
         )}
       </div>
+
+      {/* Merged-shell warning */}
+      {before.mergedShellWarning && (
+        <div className="px-4 pb-3">
+          <div className="flex items-start gap-2 text-xs text-orange-300 bg-orange-400/8 border border-orange-400/20 rounded-lg px-3 py-2.5">
+            <Info size={13} className="mt-0.5 shrink-0" />
+            <span>{t.report.mergedShellWarning}</span>
+          </div>
+        </div>
+      )}
 
       {/* Unit warning if present */}
       {before.unitWarning && (

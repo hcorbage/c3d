@@ -444,32 +444,33 @@ export function resolveIntersections(
     console.log(`  shell ${s}: ${shellList[s].length} triangles`);
   }
 
-  // Detect "dominant-shell" case: one shell holds ≥ 80% of all triangles.
+  // Detect "dominant-shell" case: one shell holds ≥ 90% of all triangles.
   // This means the parts (feather, vest, etc.) are MERGED into a single
-  // connected mesh — the between-shell algorithm won't help. Fall back to
-  // geometric self-intersection detection (Möller triangle-triangle test).
+  // connected mesh. The between-shell ray-casting algorithm cannot help here —
+  // it needs two distinct closed surfaces to test inside/outside. Attempting
+  // to run it would damage the model by removing arbitrary surface triangles.
+  //
+  // The correct fix for merged single-shell models requires true mesh boolean
+  // operations (Blender, etc.). We return early, preserving the mesh intact.
   const dominantFraction = largestSize / totalTris;
-  const hasDominantShell = dominantFraction >= 0.8;
+  const hasDominantShell = dominantFraction >= 0.9;
 
   const toRemove = new Set<number>();
 
   if (hasDominantShell) {
     console.log(
       `[resolveIntersections] dominant single shell (${(dominantFraction * 100).toFixed(1)}% of triangles) ` +
-      `→ switching to Möller self-intersection detection`,
+      `→ model parts are merged into one mesh; cannot auto-separate. Returning unchanged.`,
     );
-    // Mark tiny separate shells (floating debris) for removal by object ref
-    const tinyShellObjs = new Set<Triangle>();
+    // Only remove tiny floating debris fragments (< 100 triangles)
     for (let s = 1; s < shellList.length; s++) {
       if (shellList[s].length < 100) {
-        for (const idx of shellList[s]) tinyShellObjs.add(triangles[idx]);
+        for (const idx of shellList[s]) toRemove.add(idx);
       }
     }
-    // Run geometric self-intersection detection on the full mesh
-    const selfResult = removeSelfIntersections(triangles);
     return {
-      triangles: selfResult.triangles.filter((t) => !tinyShellObjs.has(t)),
-      resolved: selfResult.resolved + tinyShellObjs.size,
+      triangles: triangles.filter((_, i) => !toRemove.has(i)),
+      resolved: toRemove.size,
     };
   }
 

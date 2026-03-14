@@ -42,6 +42,7 @@ export interface QualityReportSnapshot {
   duplicates?: number;
   degenerates?: number;
   unitWarning?: "inches" | "meters" | null;
+  mergedShellWarning?: boolean;
 }
 
 export interface QualityReportFixes {
