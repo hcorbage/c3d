@@ -47,10 +47,10 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     const shouldSplitShells = req.body.splitShells === "true";
     const shouldSmoothSeams = req.body.smoothSeams === "true";
     const decimateRatio = Math.min(0.95, Math.max(0.05, parseFloat(req.body.decimateRatio ?? "0.5") || 0.5));
-    // Keep maxHoleSize conservative: filling large holes (wings, mouths, sockets)
-    // with flat polygon caps creates visible flat black patches in slicers.
-    // Default = 30 edges; capped at 200 to avoid destroying open-body models.
-    const maxHoleSize = Math.min(200, Math.max(3, parseInt(req.body.maxHoleSize ?? "30", 10) || 30));
+    // Default = 100 edges. Character models with very large structural openings
+    // (wing spans, body cavities) risk getting flat caps — users can lower this.
+    // Hard cap at 500 to prevent filling intentionally-open geometry on large models.
+    const maxHoleSize = Math.min(500, Math.max(3, parseInt(req.body.maxHoleSize ?? "100", 10) || 100));
     const smoothingIterations = Math.min(20, Math.max(0, parseInt(req.body.smoothingIterations ?? "3", 10) || 0));
 
     // Credit cost

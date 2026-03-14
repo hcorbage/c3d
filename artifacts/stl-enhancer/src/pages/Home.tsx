@@ -61,6 +61,7 @@ export default function Home() {
   const [removeDuplicates, setRemoveDuplicates] = useState(true);
   const [fixNormals, setFixNormals] = useState(true);
   const [fillHoles, setFillHoles] = useState(true);
+  const [maxHoleSize, setMaxHoleSize] = useState(100);
   const [mergeShells, setMergeShells] = useState(false);
   const [decimate, setDecimate] = useState(false);
   const [decimateRatio, setDecimateRatio] = useState(50);
@@ -267,6 +268,7 @@ export default function Home() {
         removeDuplicates,
         fixNormals,
         fillHoles,
+        maxHoleSize: fillHoles ? maxHoleSize : undefined,
         mergeShells,
         decimate,
         decimateRatio: decimate ? decimateRatio / 100 : undefined,
@@ -588,6 +590,25 @@ export default function Home() {
                     onCheckedChange={setFillHoles} 
                   />
                 </div>
+                {/* Hole size slider — shown when Fill Holes is active */}
+                {fillHoles && (
+                  <div className="mt-3 space-y-1.5">
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span>{t.options.maxHoleSize}</span>
+                      <span className="font-semibold text-foreground">{maxHoleSize} {t.options.edges}</span>
+                    </div>
+                    <input
+                      type="range" min={5} max={500} step={5}
+                      value={maxHoleSize}
+                      onChange={e => setMaxHoleSize(Number(e.target.value))}
+                      className="w-full h-1.5 rounded-full accent-blue-500 cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-muted-foreground/60">
+                      <span>{t.options.maxHoleSizeSmall}</span>
+                      <span>{t.options.maxHoleSizeLarge}</span>
+                    </div>
+                  </div>
+                )}
                 {stats && !stats.isManifold && (
                   <div className="mt-3 flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-xl px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
