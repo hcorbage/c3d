@@ -33,10 +33,14 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     if (!req.file) { res.status(400).json({ error: "No file uploaded" }); return; }
 
     const isAdmin = req.user!.isAdmin;
+    const shouldMergeShellsEarly = req.body.mergeShells === "true";
+    const shouldDecimateEarly = req.body.decimate === "true";
+    const creditCost = 1 + (shouldMergeShellsEarly ? 1 : 0) + (shouldDecimateEarly ? 1 : 0);
+
     if (!isAdmin) {
       const [userRow] = await db.select({ credits: usersTable.credits }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
-      if (!userRow || userRow.credits < 1) {
-        res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+      if (!userRow || userRow.credits < creditCost) {
+        res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS", required: creditCost });
         return;
       }
     }
@@ -107,12 +111,12 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
 
     const outputBuffer = writeBinaryStl(triangles);
 
-    // Deduct 1 credit (non-admin only)
+    // Deduct credits (non-admin only)
     if (!isAdmin) {
-      await db.update(usersTable).set({ credits: sql`${usersTable.credits} - 1` }).where(eq(usersTable.id, req.user!.id));
+      await db.update(usersTable).set({ credits: sql`${usersTable.credits} - ${creditCost}` }).where(eq(usersTable.id, req.user!.id));
       await db.insert(creditTransactionsTable).values({
         userId: req.user!.id,
-        amount: -1,
+        amount: -creditCost,
         type: "use",
         description: "STL enhancement",
       });

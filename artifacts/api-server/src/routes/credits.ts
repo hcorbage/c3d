@@ -14,20 +14,28 @@ function getStripe(): Stripe {
 
 export const CREDIT_PACKAGES = [
   {
-    id: "pkg_15",
-    credits: 15,
+    id: "pkg_10",
+    credits: 10,
     price: 990, // in cents (R$ 9,90)
     currency: "brl",
-    label: "15 créditos",
-    labelEn: "15 credits",
+    label: "10 créditos",
+    labelEn: "10 credits",
   },
   {
-    id: "pkg_60",
-    credits: 60,
+    id: "pkg_40",
+    credits: 40,
     price: 3490, // in cents (R$ 34,90)
     currency: "brl",
-    label: "60 créditos",
-    labelEn: "60 credits",
+    label: "40 créditos",
+    labelEn: "40 credits",
+  },
+  {
+    id: "pkg_100",
+    credits: 100,
+    price: 7990, // in cents (R$ 79,90)
+    currency: "brl",
+    label: "100 créditos",
+    labelEn: "100 credits",
   },
 ];
 

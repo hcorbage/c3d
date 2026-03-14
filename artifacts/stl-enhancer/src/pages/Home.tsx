@@ -66,6 +66,8 @@ export default function Home() {
   const [decimateRatio, setDecimateRatio] = useState(50);
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
 
+  const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0);
+
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -190,7 +192,7 @@ export default function Home() {
       setShowAuthModal(true);
       return;
     }
-    if (!user.isAdmin && user.credits < 1) {
+    if (!user.isAdmin && user.credits < totalCredits) {
       toast({
         title: t.credits.insufficient,
         description: t.credits.insufficientDesc,
@@ -501,6 +503,7 @@ export default function Home() {
                     <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="fill-holes">
                       <ShieldCheck className="w-4 h-4 text-blue-400" />
                       {t.options.fillHoles}
+                      <CreditBadge label={t.credits.included} color="gray" />
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       {t.options.fillHolesDesc}
@@ -526,7 +529,10 @@ export default function Home() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <Label className="text-base text-foreground font-medium">{t.options.smoothing}</Label>
+                    <Label className="text-base text-foreground font-medium flex items-center gap-2">
+                      {t.options.smoothing}
+                      <CreditBadge label={t.credits.included} color="gray" />
+                    </Label>
                     {/* Botão de ajuda com tooltip */}
                     <div className="relative group">
                       <button className="w-5 h-5 rounded-full bg-secondary border border-white/15 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors flex items-center justify-center text-xs font-bold leading-none">
@@ -560,7 +566,10 @@ export default function Home() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label className="text-base font-medium cursor-pointer" htmlFor="remove-dupes">{t.options.removeDuplicates}</Label>
+                    <Label className="text-base font-medium cursor-pointer flex items-center gap-2" htmlFor="remove-dupes">
+                      {t.options.removeDuplicates}
+                      <CreditBadge label={t.credits.included} color="gray" />
+                    </Label>
                     <p className="text-xs text-muted-foreground">{t.options.removeDuplicatesDesc}</p>
                   </div>
                   <Switch 
@@ -572,7 +581,10 @@ export default function Home() {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label className="text-base font-medium cursor-pointer" htmlFor="fix-normals">{t.options.fixNormals}</Label>
+                    <Label className="text-base font-medium cursor-pointer flex items-center gap-2" htmlFor="fix-normals">
+                      {t.options.fixNormals}
+                      <CreditBadge label={t.credits.included} color="gray" />
+                    </Label>
                     <p className="text-xs text-muted-foreground">{t.options.fixNormalsDesc}</p>
                   </div>
                   <Switch 
@@ -589,6 +601,7 @@ export default function Home() {
                       <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="merge-shells">
                         <GitMerge className="w-4 h-4 text-cyan-400" />
                         {t.options.mergeShells}
+                        <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="cyan" />
                       </Label>
                       <p className="text-xs text-muted-foreground">{t.options.mergeShellsDesc}</p>
                     </div>
@@ -611,6 +624,7 @@ export default function Home() {
                   <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="decimate">
                     <Scissors className="w-4 h-4 text-purple-400" />
                     {t.options.decimate}
+                    <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="purple" />
                   </Label>
                   <Switch id="decimate" checked={decimate} onCheckedChange={setDecimate} />
                 </div>
@@ -649,38 +663,46 @@ export default function Home() {
                 <LogIn className="w-5 h-5" />
                 {t.auth.signInToEnhance}
               </button>
-            ) : !user.isAdmin && user.credits < 1 ? (
-              <button
-                onClick={() => setShowCreditsModal(true)}
-                className="mt-8 w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-all duration-300"
-              >
-                <CreditCard className="w-5 h-5" />
-                {t.credits.buy}
-              </button>
+            ) : !user.isAdmin && user.credits < totalCredits ? (
+              <div className="mt-8 space-y-3">
+                <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} />
+                <button
+                  onClick={() => setShowCreditsModal(true)}
+                  className="w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-all duration-300"
+                >
+                  <CreditCard className="w-5 h-5" />
+                  {t.credits.buy}
+                </button>
+              </div>
             ) : (
-              <button
-                onClick={handleEnhance}
-                disabled={!file || enhanceMutation.isPending || statsMutation.isPending}
-                className={`
-                  mt-8 w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2
-                  transition-all duration-300 relative overflow-hidden
-                  ${(!file || enhanceMutation.isPending) 
-                    ? 'bg-secondary text-muted-foreground cursor-not-allowed' 
-                    : 'bg-primary text-primary-foreground hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)] hover:-translate-y-1 active:translate-y-0'}
-                `}
-              >
-                {enhanceMutation.isPending ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    {t.actions.processing}
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-5 h-5" />
-                    {t.actions.enhance}
-                  </>
+              <div className="mt-8 space-y-3">
+                {user && !user.isAdmin && (
+                  <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} />
                 )}
-              </button>
+                <button
+                  onClick={handleEnhance}
+                  disabled={!file || enhanceMutation.isPending || statsMutation.isPending}
+                  className={`
+                    w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2
+                    transition-all duration-300 relative overflow-hidden
+                    ${(!file || enhanceMutation.isPending) 
+                      ? 'bg-secondary text-muted-foreground cursor-not-allowed' 
+                      : 'bg-primary text-primary-foreground hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)] hover:-translate-y-1 active:translate-y-0'}
+                  `}
+                >
+                  {enhanceMutation.isPending ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      {t.actions.processing}
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-5 h-5" />
+                      {t.actions.enhance}
+                    </>
+                  )}
+                </button>
+              </div>
             )}
 
           {/* Quality Report Panel */}
@@ -703,6 +725,59 @@ export default function Home() {
       {showCreditsModal && (
         <CreditsModal onClose={() => setShowCreditsModal(false)} />
       )}
+    </div>
+  );
+}
+
+function CreditBadge({ label, color = "blue" }: { label: string; color?: "blue" | "cyan" | "purple" | "gray" }) {
+  const colors = {
+    blue:   "bg-blue-500/15 text-blue-300 border-blue-500/20",
+    cyan:   "bg-cyan-500/15 text-cyan-300 border-cyan-500/20",
+    purple: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+    gray:   "bg-white/5 text-muted-foreground border-white/10",
+  };
+  return (
+    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${colors[color]} shrink-0`}>
+      {label}
+    </span>
+  );
+}
+
+function CreditCostSummary({ totalCredits, mergeShells, decimate }: { totalCredits: number; mergeShells: boolean; decimate: boolean }) {
+  const { t } = useLanguage();
+  const label = totalCredits === 1 ? t.credits.creditSingular : t.credits.creditPlural;
+  return (
+    <div className="rounded-2xl bg-secondary/50 border border-white/8 p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{t.credits.costBreakdown}</span>
+        <span className="text-sm font-bold text-primary">{totalCredits} {label}</span>
+      </div>
+      <div className="h-px bg-border" />
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{t.credits.costBase}</span>
+          <CreditBadge label={`1 ${t.credits.creditSingular}`} color="blue" />
+        </div>
+        {mergeShells && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-cyan-300">{t.credits.costMerge}</span>
+            <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="cyan" />
+          </div>
+        )}
+        {decimate && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-purple-300">{t.credits.costDecimate}</span>
+            <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="purple" />
+          </div>
+        )}
+      </div>
+      <div className="h-px bg-border" />
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-foreground">{t.credits.totalCost}</span>
+        <span className={`text-base font-black font-mono ${totalCredits === 3 ? 'text-purple-400' : totalCredits === 2 ? 'text-cyan-400' : 'text-blue-400'}`}>
+          {totalCredits} {label}
+        </span>
+      </div>
     </div>
   );
 }
