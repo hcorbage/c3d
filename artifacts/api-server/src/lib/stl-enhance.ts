@@ -123,22 +123,44 @@ export function laplacianSmooth(triangles: Triangle[], iterations: number): Tria
     getOrAddVertex(tri.v3),
   ]);
 
-  // Build adjacency: for each vertex, list of neighbor vertex indices
-  const neighbors: Set<number>[] = Array.from({ length: vertices.length }, () => new Set<number>());
+  const numVerts = vertices.length;
 
+  // Build adjacency
+  const neighbors: Set<number>[] = Array.from({ length: numVerts }, () => new Set<number>());
+
+  // Detect boundary vertices: an edge key "a-b" (a<b) that appears only once is a boundary edge
+  const edgeCount = new Map<string, number>();
   for (const [a, b, c] of faces) {
-    neighbors[a].add(b);
-    neighbors[a].add(c);
-    neighbors[b].add(a);
-    neighbors[b].add(c);
-    neighbors[c].add(a);
-    neighbors[c].add(b);
+    neighbors[a].add(b); neighbors[a].add(c);
+    neighbors[b].add(a); neighbors[b].add(c);
+    neighbors[c].add(a); neighbors[c].add(b);
+
+    const edges: [number, number][] = [[a, b], [b, c], [a, c]];
+    for (const [p, q] of edges) {
+      const key = p < q ? `${p}-${q}` : `${q}-${p}`;
+      edgeCount.set(key, (edgeCount.get(key) ?? 0) + 1);
+    }
+  }
+
+  // A vertex is "pinned" (boundary) if any of its edges appears only once
+  const pinned = new Uint8Array(numVerts);
+  for (const [key, count] of edgeCount) {
+    if (count === 1) {
+      const [a, b] = key.split("-").map(Number);
+      pinned[a] = 1;
+      pinned[b] = 1;
+    }
   }
 
   let verts = vertices.map((v) => [...v] as Vec3);
 
+  // Very gentle lambda — keeps detail while reducing only high-freq noise
+  const lambda = 0.2;
+
   for (let iter = 0; iter < iterations; iter++) {
     const newVerts = verts.map((v, i) => {
+      // Never move boundary/open-edge vertices — they hold the shape of seams between shells
+      if (pinned[i]) return v;
       const nbrs = [...neighbors[i]];
       if (nbrs.length === 0) return v;
       const avg: Vec3 = [0, 0, 0];
@@ -148,8 +170,6 @@ export function laplacianSmooth(triangles: Triangle[], iterations: number): Tria
         avg[2] += verts[nb][2];
       }
       const n = nbrs.length;
-      // Gentle smoothing: blend original (70%) with average (30%)
-      const lambda = 0.3;
       return [
         v[0] * (1 - lambda) + (avg[0] / n) * lambda,
         v[1] * (1 - lambda) + (avg[1] / n) * lambda,
