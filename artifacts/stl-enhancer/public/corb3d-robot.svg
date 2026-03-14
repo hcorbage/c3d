@@ -2,8 +2,8 @@
   <defs>
     <radialGradient id="beacon" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="40%" stop-color="#ff8800"/>
-      <stop offset="100%" stop-color="#ff4400" stop-opacity="0"/>
+      <stop offset="40%" stop-color="#ff2222"/>
+      <stop offset="100%" stop-color="#cc0000" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="greenLight" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff"/>
@@ -83,10 +83,10 @@
 
   <!-- ═══ ANTENA CENTRAL (beacon anti-colisão laranja) ═══ -->
   <rect x="58" y="29" width="4" height="22" rx="2" fill="#6a8e70"/>
-  <circle cx="60" cy="26" r="5.5" fill="#cc4400"/>
-  <circle cx="60" cy="26" r="4" fill="#ff6600"/>
+  <circle cx="60" cy="26" r="5.5" fill="#880000"/>
+  <circle cx="60" cy="26" r="4" fill="#cc0000"/>
   <circle class="beacon" cx="60" cy="26" r="9" fill="url(#beacon)" opacity="0.6"/>
-  <circle class="beaconCore" cx="60" cy="26" r="3" fill="#ffaa00"/>
+  <circle class="beaconCore" cx="60" cy="26" r="3" fill="#ff2222"/>
   <circle cx="59" cy="25" r="1.2" fill="#ffffff" opacity="0.9"/>
 
   <!-- ═══ ESQUERDA DA TELA = verde ═══ -->
