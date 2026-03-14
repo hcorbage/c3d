@@ -88,16 +88,27 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     // Must run on original topology so findShells() can distinguish separate
     // shells. Running removeDuplicates first can merge boundary vertices and
     // collapse multiple shells into one, making resolveIntersections a no-op.
-    // Also: we must NOT re-fill holes after resolving — those boundary holes
-    // are the clean separators BambuLab needs for per-shell painting.
     if (shouldResolveIntersections) {
       const result = resolveIntersections(triangles);
       fixes.intersectionsResolved = result.resolved;
       triangles = result.triangles;
       console.log(`[resolveIntersections] removed ${result.resolved} hidden triangles`);
 
-      // Smooth the open boundary loops left by resolveIntersections — makes the
-      // seam lines between shells smooth instead of jagged/zigzagged
+      // Fill holes immediately after resolveIntersections — run 3 passes because
+      // T-junction boundaries (where 3+ shells met) resolve progressively.
+      // We fill BEFORE removeDuplicates and BEFORE smoothing so vertex positions
+      // are still exact and boundary loops can be traced cleanly.
+      if (shouldFillHoles) {
+        for (let pass = 0; pass < 3; pass++) {
+          const r = fillHoles(triangles, maxHoleSize);
+          fixes.holesFilled += r.holesFilled;
+          triangles = r.triangles;
+          if (r.holesFilled === 0) break; // converged
+        }
+        console.log(`[fillHoles-post-resolve] total holes filled: ${fixes.holesFilled}`);
+      }
+
+      // Smooth boundary seams AFTER filling so we don't disturb open rims
       triangles = smoothBoundaryLoops(triangles, 10);
       console.log(`[smoothBoundaryLoops] smoothed boundary seams (10 Taubin iterations)`);
     }
@@ -109,9 +120,10 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       triangles = result.triangles;
     }
 
+    // Second fillHoles pass (handles pre-existing holes + any left from resolveIntersections)
     if (shouldFillHoles) {
       const result = fillHoles(triangles, maxHoleSize);
-      fixes.holesFilled = result.holesFilled;
+      fixes.holesFilled += result.holesFilled;
       triangles = result.triangles;
     }
 

@@ -96,6 +96,9 @@ export function fillHoles(triangles: Triangle[], maxHoleSize = 500): FillHolesRe
   const visited = new Set<number>();
   const loops: number[][] = [];
 
+  // Increase safety limit for large complex models
+  const MAX_LOOP_LEN = 100_000;
+
   for (const startV of boundaryEdgeMap.keys()) {
     if (visited.has(startV)) continue;
 
@@ -103,13 +106,15 @@ export function fillHoles(triangles: Triangle[], maxHoleSize = 500): FillHolesRe
     let current = startV;
     let safety = 0;
 
-    while (!visited.has(current) && safety < 10000) {
+    while (!visited.has(current) && safety < MAX_LOOP_LEN) {
       visited.add(current);
       loop.push(current);
       const nexts = boundaryEdgeMap.get(current);
       if (!nexts || nexts.length === 0) break;
-      // Pick next unvisited neighbor, or first
-      const next = nexts.find((n) => !visited.has(n)) ?? nexts[0];
+      // Prefer next unvisited; if all visited pick one that leads back to start
+      const next = nexts.find((n) => !visited.has(n))
+        ?? nexts.find((n) => n === startV)
+        ?? nexts[0];
       current = next;
       safety++;
     }
@@ -124,8 +129,13 @@ export function fillHoles(triangles: Triangle[], maxHoleSize = 500): FillHolesRe
   let holesFilled = 0;
   let trianglesAdded = 0;
 
+  console.log(`[fillHoles] found ${loops.length} boundary loop(s); sizes: ${loops.map(l => l.length).sort((a,b)=>b-a).slice(0,10).join(', ')}; maxHoleSize=${maxHoleSize}`);
+
   for (const loop of loops) {
-    if (loop.length < 3 || loop.length > maxHoleSize) continue;
+    if (loop.length < 3 || loop.length > maxHoleSize) {
+      if (loop.length > maxHoleSize) console.log(`[fillHoles] skipping loop with ${loop.length} edges (> maxHoleSize ${maxHoleSize})`);
+      continue;
+    }
 
     // Compute centroid of the loop
     let cx = 0, cy = 0, cz = 0;
@@ -179,5 +189,6 @@ export function fillHoles(triangles: Triangle[], maxHoleSize = 500): FillHolesRe
     holesFilled++;
   }
 
+  console.log(`[fillHoles] filled ${holesFilled} hole(s), added ${trianglesAdded} triangles`);
   return { triangles: newTriangles, holesFilled, trianglesAdded };
 }
