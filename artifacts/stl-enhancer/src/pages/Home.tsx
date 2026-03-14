@@ -493,8 +493,21 @@ export default function Home() {
 
               {/* Smoothing */}
               <div className="space-y-4">
-                <div className="flex justify-between">
-                  <Label className="text-base text-foreground font-medium">{t.options.smoothing}</Label>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-base text-foreground font-medium">{t.options.smoothing}</Label>
+                    {/* Botão de ajuda com tooltip */}
+                    <div className="relative group">
+                      <button className="w-5 h-5 rounded-full bg-secondary border border-white/15 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors flex items-center justify-center text-xs font-bold leading-none">
+                        ?
+                      </button>
+                      <div className="absolute left-0 bottom-full mb-2 w-72 p-3 rounded-xl bg-gray-900 border border-white/10 shadow-2xl text-xs text-muted-foreground leading-relaxed
+                                      invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50 pointer-events-none">
+                        <p className="text-foreground font-semibold mb-1">{t.options.smoothing}</p>
+                        {t.options.smoothingTooltip}
+                      </div>
+                    </div>
+                  </div>
                   <span className="text-primary font-mono font-semibold bg-primary/10 px-2 py-0.5 rounded-md">
                     {smoothingIterations} {t.options.smoothingPasses}
                   </span>
