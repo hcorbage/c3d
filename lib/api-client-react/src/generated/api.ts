@@ -18,9 +18,11 @@ import type {
 
 import type {
   EnhanceStlBody,
+  EnhanceStlResult,
   ErrorResponse,
   GetStlStatsBody,
   HealthStatus,
+  QualityReport,
   StlStats,
 } from "./api.schemas";
 
@@ -110,7 +112,8 @@ export function useHealthCheck<
 }
 
 /**
- * Upload an STL file and apply mesh improvements
+ * Upload an STL file and apply mesh improvements.
+ * Returns both the enhanced STL blob and a quality report from the X-Quality-Report header.
  * @summary Enhance STL file
  */
 export const getEnhanceStlUrl = () => {
@@ -120,20 +123,14 @@ export const getEnhanceStlUrl = () => {
 export const enhanceStl = async (
   enhanceStlBody: EnhanceStlBody,
   options?: RequestInit,
-): Promise<Blob> => {
+): Promise<EnhanceStlResult> => {
   const formData = new FormData();
   formData.append(`file`, enhanceStlBody.file);
   if (enhanceStlBody.smoothingIterations !== undefined) {
-    formData.append(
-      `smoothingIterations`,
-      enhanceStlBody.smoothingIterations.toString(),
-    );
+    formData.append(`smoothingIterations`, enhanceStlBody.smoothingIterations.toString());
   }
   if (enhanceStlBody.removeDuplicates !== undefined) {
-    formData.append(
-      `removeDuplicates`,
-      enhanceStlBody.removeDuplicates.toString(),
-    );
+    formData.append(`removeDuplicates`, enhanceStlBody.removeDuplicates.toString());
   }
   if (enhanceStlBody.fixNormals !== undefined) {
     formData.append(`fixNormals`, enhanceStlBody.fixNormals.toString());
@@ -144,12 +141,51 @@ export const enhanceStl = async (
   if (enhanceStlBody.maxHoleSize !== undefined) {
     formData.append(`maxHoleSize`, enhanceStlBody.maxHoleSize.toString());
   }
+  if (enhanceStlBody.mergeShells !== undefined) {
+    formData.append(`mergeShells`, enhanceStlBody.mergeShells.toString());
+  }
+  if (enhanceStlBody.decimate !== undefined) {
+    formData.append(`decimate`, enhanceStlBody.decimate.toString());
+  }
+  if (enhanceStlBody.decimateRatio !== undefined) {
+    formData.append(`decimateRatio`, enhanceStlBody.decimateRatio.toString());
+  }
 
-  return customFetch<Blob>(getEnhanceStlUrl(), {
+  // Inject JWT
+  const headers = new Headers();
+  if (typeof localStorage !== "undefined") {
+    const token = localStorage.getItem("c3d_auth_token");
+    if (token) headers.set("authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(getEnhanceStlUrl(), {
     ...options,
     method: "POST",
     body: formData,
+    headers,
   });
+
+  if (!response.ok) {
+    let errorData: unknown = null;
+    try { errorData = await response.json(); } catch { /* ignore */ }
+    const message =
+      (errorData as Record<string, string>)?.error ||
+      `HTTP ${response.status} ${response.statusText}`;
+    const err = new Error(message) as Error & { status?: number; data?: unknown };
+    err.status = response.status;
+    err.data = errorData;
+    throw err;
+  }
+
+  const stl = await response.blob();
+
+  let qualityReport: QualityReport | null = null;
+  const reportHeader = response.headers.get("x-quality-report");
+  if (reportHeader) {
+    try { qualityReport = JSON.parse(reportHeader); } catch { /* ignore */ }
+  }
+
+  return { stl, qualityReport };
 };
 
 export const getEnhanceStlMutationOptions = <
@@ -183,7 +219,6 @@ export const getEnhanceStlMutationOptions = <
     { data: BodyType<EnhanceStlBody> }
   > = (props) => {
     const { data } = props ?? {};
-
     return enhanceStl(data, requestOptions);
   };
 
@@ -272,7 +307,6 @@ export const getGetStlStatsMutationOptions = <
     { data: BodyType<GetStlStatsBody> }
   > = (props) => {
     const { data } = props ?? {};
-
     return getStlStats(data, requestOptions);
   };
 

@@ -42,6 +42,9 @@ export interface MeshStats {
   isManifold: boolean;
   duplicateTriangles: number;
   degenerateTriangles: number;
+  shellCount: number;
+  openEdges: number;
+  unitWarning: "inches" | "meters" | null;
 }
 
 export function computeStats(triangles: Triangle[]): MeshStats {
@@ -56,13 +59,12 @@ export function computeStats(triangles: Triangle[]): MeshStats {
   const triKeys = new Set<string>();
   let duplicateTriangles = 0;
 
-  // Edge map for manifold check: each edge should appear exactly twice
   const edgeCount = new Map<string, number>();
 
   for (const tri of triangles) {
     const { v1, v2, v3 } = tri;
 
-    for (const v of [v1, v2, v3]) {
+    for (const v of [v1, v2, v3] as Vec3[]) {
       const k = vertKey(v);
       vertices.add(k);
       if (v[0] < minX) minX = v[0];
@@ -73,7 +75,7 @@ export function computeStats(triangles: Triangle[]): MeshStats {
       if (v[2] > maxZ) maxZ = v[2];
     }
 
-    const cross = vecCross(vecSub(v2, v1), vecSub(v3, v1));
+    const cross = vecCross(vecSub(v2 as Vec3, v1 as Vec3), vecSub(v3 as Vec3, v1 as Vec3));
     const area = vecLen(cross) / 2;
 
     if (area < 1e-10) {
@@ -81,8 +83,7 @@ export function computeStats(triangles: Triangle[]): MeshStats {
       continue;
     }
 
-    // Duplicate check
-    const keys = [vertKey(v1), vertKey(v2), vertKey(v3)].sort();
+    const keys = [vertKey(v1 as Vec3), vertKey(v2 as Vec3), vertKey(v3 as Vec3)].sort();
     const triKey = keys.join("|");
     if (triKeys.has(triKey)) {
       duplicateTriangles++;
@@ -90,12 +91,13 @@ export function computeStats(triangles: Triangle[]): MeshStats {
     triKeys.add(triKey);
 
     surfaceArea += area;
+    signedVolume += vecDot(v1 as Vec3, cross) / 6;
 
-    // Signed volume contribution (divergence theorem)
-    signedVolume += vecDot(v1, cross) / 6;
-
-    // Edge manifold check
-    const edgePairs: [Vec3, Vec3][] = [[v1, v2], [v2, v3], [v3, v1]];
+    const edgePairs: [Vec3, Vec3][] = [
+      [v1 as Vec3, v2 as Vec3],
+      [v2 as Vec3, v3 as Vec3],
+      [v3 as Vec3, v1 as Vec3],
+    ];
     for (const [a, b] of edgePairs) {
       const ka = vertKey(a);
       const kb = vertKey(b);
@@ -105,12 +107,49 @@ export function computeStats(triangles: Triangle[]): MeshStats {
   }
 
   let isManifold = true;
+  let openEdges = 0;
   for (const count of edgeCount.values()) {
     if (count !== 2) {
       isManifold = false;
-      break;
+      openEdges++;
     }
   }
+
+  // Shell count via Union-Find on triangles
+  const n = triangles.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  function find(x: number): number {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+  function union(a: number, b: number) {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  }
+
+  const vertToTris = new Map<string, number[]>();
+  for (let i = 0; i < n; i++) {
+    for (const v of [triangles[i].v1, triangles[i].v2, triangles[i].v3] as Vec3[]) {
+      const k = vertKey(v);
+      if (!vertToTris.has(k)) vertToTris.set(k, []);
+      vertToTris.get(k)!.push(i);
+    }
+  }
+  for (const tris of vertToTris.values()) {
+    for (let i = 1; i < tris.length; i++) union(tris[0], tris[i]);
+  }
+  const roots = new Set(Array.from({ length: n }, (_, i) => find(i)));
+  const shellCount = roots.size;
+
+  // Unit warning heuristic (STL units are usually mm for printing)
+  const maxDim = Math.max(
+    isFinite(maxX) ? maxX - minX : 0,
+    isFinite(maxY) ? maxY - minY : 0,
+    isFinite(maxZ) ? maxZ - minZ : 0,
+  );
+  let unitWarning: "inches" | "meters" | null = null;
+  if (maxDim > 0 && maxDim < 2) unitWarning = "meters";
+  else if (maxDim > 5000) unitWarning = "inches";
 
   return {
     triangleCount: triangles.length,
@@ -128,5 +167,8 @@ export function computeStats(triangles: Triangle[]): MeshStats {
     isManifold,
     duplicateTriangles,
     degenerateTriangles,
+    shellCount,
+    openEdges,
+    unitWarning,
   };
 }

@@ -19,21 +19,49 @@ export type StlStatsBoundingBox = {
 };
 
 export interface StlStats {
-  /** Number of triangles in the mesh */
   triangleCount: number;
-  /** Number of vertices */
   vertexCount: number;
   boundingBox: StlStatsBoundingBox;
-  /** Approximate volume */
   volume: number;
-  /** Total surface area */
   surfaceArea: number;
-  /** Whether the mesh is watertight/manifold */
   isManifold: boolean;
-  /** Number of duplicate triangles found */
   duplicateTriangles: number;
-  /** Number of degenerate (zero-area) triangles */
   degenerateTriangles: number;
+  shellCount: number;
+  openEdges: number;
+  unitWarning: "inches" | "meters" | null;
+}
+
+export interface QualityReportSnapshot {
+  triangles: number;
+  vertices: number;
+  shells: number;
+  openEdges: number;
+  isManifold: boolean;
+  dimensions: { x: number; y: number; z: number };
+  duplicates?: number;
+  degenerates?: number;
+  unitWarning?: "inches" | "meters" | null;
+}
+
+export interface QualityReportFixes {
+  holesFilled: number;
+  normalsFixed: number;
+  duplicatesRemoved: number;
+  degeneratesRemoved: number;
+  trianglesReduced: number;
+  shellsMerged: number;
+}
+
+export interface QualityReport {
+  before: QualityReportSnapshot;
+  after: QualityReportSnapshot;
+  fixes: QualityReportFixes;
+}
+
+export interface EnhanceStlResult {
+  stl: Blob;
+  qualityReport: QualityReport | null;
 }
 
 export interface ErrorResponse {
@@ -42,26 +70,15 @@ export interface ErrorResponse {
 }
 
 export type EnhanceStlBody = {
-  /** STL file to enhance */
   file: Blob;
-  /**
-   * Number of Laplacian smoothing passes
-   * @minimum 0
-   * @maximum 20
-   */
   smoothingIterations?: number;
-  /** Remove duplicate vertices and degenerate triangles */
   removeDuplicates?: boolean;
-  /** Fix inverted/inconsistent normals */
   fixNormals?: boolean;
-  /** Fill open boundary loops (holes) in the mesh */
   fillHoles?: boolean;
-  /**
-   * Maximum number of boundary edges in a hole to fill
-   * @minimum 3
-   * @maximum 5000
-   */
   maxHoleSize?: number;
+  mergeShells?: boolean;
+  decimate?: boolean;
+  decimateRatio?: number;
 };
 
 export type GetStlStatsBody = {

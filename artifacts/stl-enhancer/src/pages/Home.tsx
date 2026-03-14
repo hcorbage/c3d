@@ -4,15 +4,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Upload, Box, Zap, Settings2, Download, 
   Activity, Info, Layers, Maximize, AlertCircle, Eye, EyeOff, ShieldCheck,
-  LogIn, LogOut, User, CreditCard
+  LogIn, LogOut, User, CreditCard, GitMerge, Scissors
 } from "lucide-react";
 import { useEnhanceStl, useGetStlStats } from "@workspace/api-client-react";
+import type { StlStats, QualityReport } from "@workspace/api-client-react";
 import { StlViewer } from "@/components/StlViewer";
+import { QualityReportPanel } from "@/components/QualityReportPanel";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import type { StlStats } from "@workspace/api-client-react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthModal } from "@/components/AuthModal";
@@ -60,6 +61,10 @@ export default function Home() {
   const [removeDuplicates, setRemoveDuplicates] = useState(true);
   const [fixNormals, setFixNormals] = useState(true);
   const [fillHoles, setFillHoles] = useState(true);
+  const [mergeShells, setMergeShells] = useState(false);
+  const [decimate, setDecimate] = useState(false);
+  const [decimateRatio, setDecimateRatio] = useState(50);
+  const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -97,17 +102,19 @@ export default function Home() {
 
   const enhanceMutation = useEnhanceStl({
     mutation: {
-      onSuccess: (blob) => {
+      onSuccess: ({ stl, qualityReport: report }) => {
+        if (report) setQualityReport(report);
         // Salva URL para visualização comparativa
-        const previewUrl = window.URL.createObjectURL(blob);
+        const previewUrl = window.URL.createObjectURL(stl);
         setEnhancedFileUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
           return previewUrl;
         });
 
         // Download automático
+        const dlUrl = window.URL.createObjectURL(stl);
         const a = document.createElement("a");
-        a.href = previewUrl;
+        a.href = dlUrl;
         a.download = `enhanced_${file?.name || 'model.stl'}`;
         document.body.appendChild(a);
         a.click();
@@ -150,6 +157,7 @@ export default function Home() {
       setFile(selectedFile);
       const url = URL.createObjectURL(selectedFile);
       setFileUrl(url);
+      setQualityReport(null);
       // Limpa comparação ao enviar novo arquivo
       setEnhancedFileUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -198,6 +206,9 @@ export default function Home() {
         removeDuplicates,
         fixNormals,
         fillHoles,
+        mergeShells,
+        decimate,
+        decimateRatio: decimate ? decimateRatio / 100 : undefined,
       }
     });
   };
@@ -441,6 +452,18 @@ export default function Home() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">{t.stats.shells}</span>
+                    <span className={stats.shellCount > 1 ? "text-yellow-400 font-semibold" : "text-foreground font-semibold"}>
+                      {formatNumber(stats.shellCount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">{t.stats.openEdges}</span>
+                    <span className={stats.openEdges > 0 ? "text-yellow-400 font-semibold" : "text-foreground font-semibold"}>
+                      {formatNumber(stats.openEdges)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">{t.stats.duplicate}</span>
                     <span className={stats.duplicateTriangles > 0 ? "text-yellow-400 font-semibold" : "text-foreground font-semibold"}>
                       {formatNumber(stats.duplicateTriangles)}
@@ -453,6 +476,12 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
+                {stats.unitWarning && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/8 border border-yellow-400/20 rounded-xl px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {stats.unitWarning === "inches" ? t.stats.unitWarningInches : t.stats.unitWarningMeters}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -552,6 +581,60 @@ export default function Home() {
                     onCheckedChange={setFixNormals} 
                   />
                 </div>
+
+                {/* Merge Shells */}
+                <div className={`p-4 rounded-2xl border transition-all duration-300 ${mergeShells ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-secondary/40 border-white/5'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="merge-shells">
+                        <GitMerge className="w-4 h-4 text-cyan-400" />
+                        {t.options.mergeShells}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">{t.options.mergeShellsDesc}</p>
+                    </div>
+                    <Switch id="merge-shells" checked={mergeShells} onCheckedChange={setMergeShells} />
+                  </div>
+                  {stats && stats.shellCount > 1 && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-xl px-3 py-2">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      {t.options.mergeShellsWarning}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="h-px w-full bg-border" />
+
+              {/* Decimate */}
+              <div className={`p-4 rounded-2xl border transition-all duration-300 ${decimate ? 'bg-purple-500/10 border-purple-500/30' : 'bg-secondary/40 border-white/5'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="decimate">
+                    <Scissors className="w-4 h-4 text-purple-400" />
+                    {t.options.decimate}
+                  </Label>
+                  <Switch id="decimate" checked={decimate} onCheckedChange={setDecimate} />
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">{t.options.decimateDesc}</p>
+                {decimate && (
+                  <div className="space-y-2 mt-3">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        {t.options.decimateRatio}
+                        <div className="relative group">
+                          <button className="w-5 h-5 rounded-full bg-secondary border border-white/15 text-muted-foreground hover:text-foreground flex items-center justify-center text-xs font-bold">?</button>
+                          <div className="absolute left-0 bottom-full mb-2 w-72 p-3 rounded-xl bg-gray-900 border border-white/10 shadow-2xl text-xs text-muted-foreground leading-relaxed invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50 pointer-events-none">
+                            <p className="text-foreground font-semibold mb-1">{t.options.decimate}</p>
+                            {t.options.decimateTooltip}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-purple-400 font-mono font-semibold bg-purple-500/10 px-2 py-0.5 rounded-md">
+                        {decimateRatio}%
+                      </span>
+                    </div>
+                    <Slider value={[decimateRatio]} onValueChange={(v) => setDecimateRatio(v[0])} min={10} max={90} step={5} />
+                  </div>
+                )}
               </div>
 
             </div>
@@ -599,6 +682,11 @@ export default function Home() {
                 )}
               </button>
             )}
+
+          {/* Quality Report Panel */}
+          {qualityReport && (
+            <QualityReportPanel report={qualityReport} />
+          )}
 
           </div>
         </div>
