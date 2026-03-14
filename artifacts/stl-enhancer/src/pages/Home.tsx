@@ -4,12 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Upload, Box, Zap, Settings2, Download, Trash2,
   Activity, Info, Layers, Maximize, AlertCircle, CheckCircle2, Eye, EyeOff, ShieldCheck,
-  LogIn, LogOut, User, CreditCard, GitMerge, Scissors
+  LogIn, LogOut, User, CreditCard, GitMerge, Scissors, Palette
 } from "lucide-react";
 import { useEnhanceStl, useGetStlStats } from "@workspace/api-client-react";
 import type { StlStats, QualityReport } from "@workspace/api-client-react";
 import { StlViewer } from "@/components/StlViewer";
 import { QualityReportPanel } from "@/components/QualityReportPanel";
+import { ColorizePanel } from "@/components/ColorizePanel";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -71,6 +72,8 @@ export default function Home() {
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
 
   const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0) + (resolveIntersections ? 1 : 0) + (splitShells ? 1 : 0);
+
+  const [appMode, setAppMode] = useState<"enhance" | "colorize">("enhance");
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -564,11 +567,33 @@ export default function Home() {
           </AnimatePresence>
 
           <div className={`glass-panel rounded-3xl p-6 flex-1 flex flex-col transition-opacity duration-300 ${!file ? 'opacity-50 pointer-events-none' : 'opacity-100 glow-box'}`}>
-            <div className="flex items-center gap-3 mb-8">
-              <Settings2 className="w-5 h-5 text-primary" />
-              <h3 className="font-display font-semibold text-xl">{t.options.title}</h3>
+            {/* Mode tabs */}
+            <div className="flex items-center gap-2 mb-6 p-1 rounded-2xl bg-secondary/40 border border-white/5">
+              <button
+                onClick={() => setAppMode("enhance")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+                  ${appMode === "enhance" ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Settings2 className="w-4 h-4" />
+                {t.options.title}
+              </button>
+              <button
+                onClick={() => setAppMode("colorize")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+                  ${appMode === "colorize" ? "bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Palette className="w-4 h-4" />
+                {t.colorize.tabLabel}
+              </button>
             </div>
 
+            {appMode === "colorize" && (
+              <ColorizePanel
+                user={user}
+                onNeedLogin={() => { setAuthMode("login"); setShowAuthModal(true); }}
+              />
+            )}
+            {appMode === "enhance" && (<>
             <div className="space-y-8 flex-1">
 
               {/* Fill Holes */}
@@ -915,9 +940,10 @@ export default function Home() {
                 </button>
               </div>
             )}
+            </>)} {/* closes appMode === "enhance" block */}
 
           {/* Quality Report Panel */}
-          {qualityReport && (
+          {qualityReport && appMode === "enhance" && (
             <QualityReportPanel report={qualityReport} />
           )}
 
