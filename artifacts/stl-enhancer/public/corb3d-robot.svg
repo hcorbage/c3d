@@ -89,21 +89,21 @@
   <circle class="beaconCore" cx="60" cy="26" r="3" fill="#ffaa00"/>
   <circle cx="59" cy="25" r="1.2" fill="#ffffff" opacity="0.9"/>
 
-  <!-- ═══ ANTENA ESQUERDA DO ROBÔ = verde (esquerda de quem olha = direita da tela) ═══ -->
-  <path d="M102 67 Q112 55 114 46" stroke="#5a7a60" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <circle cx="115" cy="43" r="5.5" fill="#005500"/>
-  <circle cx="115" cy="43" r="4" fill="#008800"/>
-  <circle class="navRight" cx="115" cy="43" r="8" fill="url(#greenLight)" opacity="0.7"/>
-  <circle cx="115" cy="43" r="2.5" fill="#00cc44"/>
-  <circle cx="114" cy="42" r="1" fill="#ffffff" opacity="0.8"/>
-
-  <!-- ═══ ANTENA DIREITA DO ROBÔ = vermelha (direita de quem olha = esquerda da tela) ═══ -->
+  <!-- ═══ ESQUERDA DA TELA = verde ═══ -->
   <path d="M18 67 Q8 55 6 46" stroke="#5a7a60" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <circle cx="5" cy="43" r="5.5" fill="#880000"/>
-  <circle cx="5" cy="43" r="4" fill="#cc0000"/>
-  <circle class="navLeft" cx="5" cy="43" r="8" fill="url(#redLight)" opacity="0.7"/>
-  <circle cx="5" cy="43" r="2.5" fill="#ff4444"/>
+  <circle cx="5" cy="43" r="5.5" fill="#005500"/>
+  <circle cx="5" cy="43" r="4" fill="#008800"/>
+  <circle class="navLeft" cx="5" cy="43" r="8" fill="url(#greenLight)" opacity="0.7"/>
+  <circle cx="5" cy="43" r="2.5" fill="#00cc44"/>
   <circle cx="4" cy="42" r="1" fill="#ffffff" opacity="0.8"/>
+
+  <!-- ═══ DIREITA DA TELA = vermelha ═══ -->
+  <path d="M102 67 Q112 55 114 46" stroke="#5a7a60" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="115" cy="43" r="5.5" fill="#880000"/>
+  <circle cx="115" cy="43" r="4" fill="#cc0000"/>
+  <circle class="navRight" cx="115" cy="43" r="8" fill="url(#redLight)" opacity="0.7"/>
+  <circle cx="115" cy="43" r="2.5" fill="#ff4444"/>
+  <circle cx="114" cy="42" r="1" fill="#ffffff" opacity="0.8"/>
 
   <!-- ═══ STROBES (luz branca estroboscópica nas orelhas) ═══ -->
   <circle class="strobeL" cx="14" cy="73" r="7" fill="url(#strobeLight)" opacity="0.9"/>
