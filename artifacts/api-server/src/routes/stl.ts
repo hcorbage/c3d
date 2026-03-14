@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
+import archiver from "archiver";
 import { parseStl, writeBinaryStl } from "../lib/stl-parser.js";
 import { computeStats } from "../lib/stl-stats.js";
 import { removeDuplicatesAndDegenerate, fixNormals, laplacianSmooth } from "../lib/stl-enhance.js";
@@ -33,25 +34,8 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
   try {
     if (!req.file) { res.status(400).json({ error: "No file uploaded" }); return; }
 
-    const isAdmin = req.user!.isAdmin;
-    const shouldMergeShellsEarly = req.body.mergeShells === "true";
-    const shouldDecimateEarly = req.body.decimate === "true";
-    const shouldResolveEarly = req.body.resolveIntersections === "true";
-    const creditCost = 1
-      + (shouldMergeShellsEarly ? 1 : 0)
-      + (shouldDecimateEarly ? 1 : 0)
-      + (shouldResolveEarly ? 1 : 0);
-
-    if (!isAdmin) {
-      const [userRow] = await db.select({ credits: usersTable.credits }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
-      if (!userRow || userRow.credits < creditCost) {
-        res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS", required: creditCost });
-        return;
-      }
-    }
-
-    const mesh = parseStl(req.file.buffer);
-    let triangles = mesh.triangles;
+    const isAdmin = (req as any).user?.isAdmin === true;
+    let triangles = parseStl(req.file.buffer).triangles;
 
     // Parse options
     const shouldRemoveDuplicates = req.body.removeDuplicates !== "false";
@@ -60,12 +44,26 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     const shouldMergeShells = req.body.mergeShells === "true";
     const shouldDecimate = req.body.decimate === "true";
     const shouldResolveIntersections = req.body.resolveIntersections === "true";
+    const shouldSplitShells = req.body.splitShells === "true";
     const decimateRatio = Math.min(0.95, Math.max(0.05, parseFloat(req.body.decimateRatio ?? "0.5") || 0.5));
     const maxHoleSize = Math.min(5000, Math.max(3, parseInt(req.body.maxHoleSize ?? "500", 10) || 500));
     const smoothingIterations = Math.min(20, Math.max(0, parseInt(req.body.smoothingIterations ?? "3", 10) || 0));
 
-    // Compute BEFORE stats
-    const beforeStats = computeStats(triangles);
+    // Credit cost
+    const creditCost =
+      1 +
+      (shouldMergeShells ? 1 : 0) +
+      (shouldDecimate ? 1 : 0) +
+      (shouldResolveIntersections ? 1 : 0) +
+      (shouldSplitShells ? 1 : 0);
+
+    if (!isAdmin) {
+      const [userRow] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.id));
+      if (!userRow || userRow.credits < creditCost) {
+        res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+        return;
+      }
+    }
 
     // Track what was fixed
     const fixes = {
@@ -77,6 +75,9 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       shellsMerged: 0,
       intersectionsResolved: 0,
     };
+
+    // Compute BEFORE stats
+    const beforeStats = computeStats(triangles);
 
     // ── Resolve intersections FIRST, before any vertex merging ──────────────
     // Must run on original topology so findShells() can distinguish separate
@@ -129,8 +130,6 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     // Compute AFTER stats
     const afterStats = computeStats(triangles);
 
-    const outputBuffer = writeBinaryStl(triangles);
-
     // Deduct credits (non-admin only)
     if (!isAdmin) {
       await db.update(usersTable).set({ credits: sql`${usersTable.credits} - ${creditCost}` }).where(eq(usersTable.id, req.user!.id));
@@ -143,6 +142,7 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
           shouldMergeShells ? "mesclar cascas" : "",
           shouldDecimate ? `decimação ${Math.round(decimateRatio * 100)}%` : "",
           shouldResolveIntersections ? "resolver interseções" : "",
+          shouldSplitShells ? "separar partes" : "",
         ].filter(Boolean).join(" + "),
       });
     }
@@ -179,12 +179,46 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       fixes,
     };
 
+    const exposedHeaders = "X-Quality-Report, X-Parts-Count";
+
+    // ── Split Shells: return a ZIP with one STL per detected shell ────────────
+    if (shouldSplitShells) {
+      const { shells } = detectShells(triangles);
+
+      // Sort shells largest-first so part_1 is the main body
+      shells.sort((a, b) => b.length - a.length);
+
+      const partsCount = shells.length;
+      console.log(`[splitShells] detected ${partsCount} shell(s)`);
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="parts.zip"`);
+      res.setHeader("X-Quality-Report", JSON.stringify(qualityReport));
+      res.setHeader("X-Parts-Count", String(partsCount));
+      res.setHeader("Access-Control-Expose-Headers", exposedHeaders);
+
+      const archive = archiver("zip", { zlib: { level: 6 } });
+      archive.on("error", (err: Error) => { throw err; });
+      archive.pipe(res);
+
+      for (let i = 0; i < shells.length; i++) {
+        const shellBuf = writeBinaryStl(shells[i]);
+        archive.append(shellBuf, { name: `part_${i + 1}.stl` });
+      }
+
+      await archive.finalize();
+      return;
+    }
+
+    // ── Default: single enhanced STL ─────────────────────────────────────────
+    const outputBuffer = writeBinaryStl(triangles);
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader("Content-Disposition", 'attachment; filename="enhanced.stl"');
     res.setHeader("Content-Length", outputBuffer.length);
     res.setHeader("X-Quality-Report", JSON.stringify(qualityReport));
-    res.setHeader("Access-Control-Expose-Headers", "X-Quality-Report");
+    res.setHeader("Access-Control-Expose-Headers", exposedHeaders);
     res.send(outputBuffer);
+
   } catch (err) {
     console.error("Enhance error:", err);
     res.status(500).json({ error: "Failed to enhance STL", details: String(err) });

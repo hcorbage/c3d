@@ -150,6 +150,12 @@ export const enhanceStl = async (
   if (enhanceStlBody.decimateRatio !== undefined) {
     formData.append(`decimateRatio`, enhanceStlBody.decimateRatio.toString());
   }
+  if (enhanceStlBody.resolveIntersections !== undefined) {
+    formData.append(`resolveIntersections`, enhanceStlBody.resolveIntersections.toString());
+  }
+  if (enhanceStlBody.splitShells !== undefined) {
+    formData.append(`splitShells`, enhanceStlBody.splitShells.toString());
+  }
 
   // Inject JWT
   const headers = new Headers();
@@ -185,7 +191,11 @@ export const enhanceStl = async (
     try { qualityReport = JSON.parse(reportHeader); } catch { /* ignore */ }
   }
 
-  return { stl, qualityReport };
+  const partsCountHeader = response.headers.get("x-parts-count");
+  const partsCount = partsCountHeader ? parseInt(partsCountHeader, 10) : undefined;
+  const isZip = response.headers.get("content-type")?.includes("zip") ?? false;
+
+  return { stl, qualityReport, partsCount, isZip };
 };
 
 export const getEnhanceStlMutationOptions = <

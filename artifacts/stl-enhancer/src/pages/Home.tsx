@@ -65,9 +65,10 @@ export default function Home() {
   const [decimate, setDecimate] = useState(false);
   const [decimateRatio, setDecimateRatio] = useState(50);
   const [resolveIntersections, setResolveIntersections] = useState(false);
+  const [splitShells, setSplitShells] = useState(false);
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
 
-  const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0) + (resolveIntersections ? 1 : 0);
+  const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0) + (resolveIntersections ? 1 : 0) + (splitShells ? 1 : 0);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -105,8 +106,28 @@ export default function Home() {
 
   const enhanceMutation = useEnhanceStl({
     mutation: {
-      onSuccess: ({ stl, qualityReport: report }) => {
+      onSuccess: ({ stl, qualityReport: report, isZip, partsCount }) => {
         if (report) setQualityReport(report);
+
+        // ZIP download (splitShells mode) — skip 3D preview
+        if (isZip) {
+          const dlUrl = window.URL.createObjectURL(stl);
+          const a = document.createElement("a");
+          a.href = dlUrl;
+          a.download = "parts.zip";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => window.URL.revokeObjectURL(dlUrl), 5000);
+          toast({
+            title: t.toast.downloadReady,
+            description: partsCount != null
+              ? `${partsCount} ${partsCount === 1 ? "part" : "parts"} exported`
+              : undefined,
+          });
+          return;
+        }
+
         // Salva URL para visualização comparativa
         const previewUrl = window.URL.createObjectURL(stl);
         setEnhancedFileUrl((prev) => {
@@ -249,6 +270,7 @@ export default function Home() {
         decimate,
         decimateRatio: decimate ? decimateRatio / 100 : undefined,
         resolveIntersections,
+        splitShells,
       }
     });
   };
@@ -739,6 +761,39 @@ export default function Home() {
                 )}
               </div>
 
+              {/* Split Shells */}
+              <div className={`p-4 rounded-2xl border transition-all duration-300 ${splitShells ? 'bg-teal-500/10 border-teal-500/30' : 'bg-secondary/40 border-white/5'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="split-shells">
+                    <svg className="w-4 h-4 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 14h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M10 4H4v6h6z" strokeOpacity="0.4"/><path d="M14 14h6v6h-6z" strokeOpacity="0.4"/>
+                    </svg>
+                    {t.options.splitShells}
+                    <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="teal" />
+                  </Label>
+                  <Switch
+                    id="split-shells"
+                    checked={splitShells}
+                    onCheckedChange={(v) => {
+                      setSplitShells(v);
+                      if (v) setMergeShells(false);
+                    }}
+                    disabled={mergeShells}
+                  />
+                </div>
+                {mergeShells ? (
+                  <p className="text-xs text-yellow-400/80">{t.options.splitShellsConflict}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{t.options.splitShellsDesc}</p>
+                )}
+                {stats && stats.shellCount > 1 && !mergeShells && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-teal-400 bg-teal-400/10 border border-teal-400/20 rounded-xl px-3 py-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    {t.options.splitShellsHint}
+                  </div>
+                )}
+              </div>
+
             </div>
 
             {/* Action Button */}
@@ -753,7 +808,7 @@ export default function Home() {
               </button>
             ) : !user.isAdmin && user.credits < totalCredits ? (
               <div className="mt-8 space-y-3">
-                <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} resolveIntersections={resolveIntersections} />
+                <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} resolveIntersections={resolveIntersections} splitShells={splitShells} />
                 <button
                   onClick={() => setShowCreditsModal(true)}
                   className="w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-all duration-300"
@@ -765,7 +820,7 @@ export default function Home() {
             ) : (
               <div className="mt-8 space-y-3">
                 {user && !user.isAdmin && (
-                  <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} resolveIntersections={resolveIntersections} />
+                  <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} resolveIntersections={resolveIntersections} splitShells={splitShells} />
                 )}
                 <button
                   onClick={handleEnhance}
@@ -832,10 +887,11 @@ export default function Home() {
   );
 }
 
-function CreditBadge({ label, color = "blue" }: { label: string; color?: "blue" | "cyan" | "purple" | "orange" | "gray" }) {
+function CreditBadge({ label, color = "blue" }: { label: string; color?: "blue" | "cyan" | "purple" | "orange" | "gray" | "teal" }) {
   const colors = {
     blue:   "bg-blue-500/15 text-blue-300 border-blue-500/20",
     cyan:   "bg-cyan-500/15 text-cyan-300 border-cyan-500/20",
+    teal:   "bg-teal-500/15 text-teal-300 border-teal-500/20",
     purple: "bg-purple-500/15 text-purple-300 border-purple-500/20",
     orange: "bg-orange-500/15 text-orange-300 border-orange-500/20",
     gray:   "bg-white/5 text-muted-foreground border-white/10",
@@ -847,7 +903,7 @@ function CreditBadge({ label, color = "blue" }: { label: string; color?: "blue" 
   );
 }
 
-function CreditCostSummary({ totalCredits, mergeShells, decimate, resolveIntersections }: { totalCredits: number; mergeShells: boolean; decimate: boolean; resolveIntersections: boolean }) {
+function CreditCostSummary({ totalCredits, mergeShells, decimate, resolveIntersections, splitShells }: { totalCredits: number; mergeShells: boolean; decimate: boolean; resolveIntersections: boolean; splitShells: boolean }) {
   const { t } = useLanguage();
   const label = totalCredits === 1 ? t.credits.creditSingular : t.credits.creditPlural;
   return (
@@ -878,6 +934,12 @@ function CreditCostSummary({ totalCredits, mergeShells, decimate, resolveInterse
           <div className="flex items-center justify-between text-sm">
             <span className="text-orange-300">{t.credits.costResolve}</span>
             <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="orange" />
+          </div>
+        )}
+        {splitShells && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-teal-300">{t.credits.costSplit}</span>
+            <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="teal" />
           </div>
         )}
       </div>

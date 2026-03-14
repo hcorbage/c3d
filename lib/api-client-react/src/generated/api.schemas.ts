@@ -63,6 +63,9 @@ export interface QualityReport {
 export interface EnhanceStlResult {
   stl: Blob;
   qualityReport: QualityReport | null;
+  /** Number of separate parts in the ZIP (only set when splitShells=true) */
+  partsCount?: number;
+  isZip?: boolean;
 }
 
 export interface ErrorResponse {
@@ -81,6 +84,7 @@ export type EnhanceStlBody = {
   decimate?: boolean;
   decimateRatio?: number;
   resolveIntersections?: boolean;
+  splitShells?: boolean;
 };
 
 export type GetStlStatsBody = {
