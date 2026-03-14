@@ -39,6 +39,9 @@ function Model({
     loader.load(
       url,
       (g) => {
+        // STL files use Z-up (CAD/slicer convention); Three.js is Y-up.
+        // Rotate geometry -90° on X so the model stands upright on the plate.
+        g.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
         g.computeVertexNormals();
         g.computeBoundingBox();
         const b  = g.boundingBox!;
