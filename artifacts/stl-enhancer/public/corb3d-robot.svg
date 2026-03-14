@@ -1,34 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 130" fill="none">
   <defs>
-    <!-- Beacon anti-colisão (laranja, pulsa lento) -->
     <radialGradient id="beacon" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff"/>
       <stop offset="40%" stop-color="#ff8800"/>
       <stop offset="100%" stop-color="#ff4400" stop-opacity="0"/>
     </radialGradient>
-    <!-- Luz vermelha (esquerda) -->
-    <radialGradient id="redLight" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="35%" stop-color="#ff2222"/>
-      <stop offset="100%" stop-color="#cc0000" stop-opacity="0"/>
-    </radialGradient>
-    <!-- Luz verde (direita) -->
     <radialGradient id="greenLight" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff"/>
       <stop offset="35%" stop-color="#00ff66"/>
       <stop offset="100%" stop-color="#00aa44" stop-opacity="0"/>
     </radialGradient>
-    <!-- Strobe branco (orelhas) -->
+    <radialGradient id="redLight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#ff2222"/>
+      <stop offset="100%" stop-color="#cc0000" stop-opacity="0"/>
+    </radialGradient>
     <radialGradient id="strobeLight" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff"/>
       <stop offset="50%" stop-color="#ffffff" stop-opacity="0.8"/>
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-    <!-- Brilho dos olhos -->
-    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#00ffee"/>
-      <stop offset="60%" stop-color="#00ccbb"/>
-      <stop offset="100%" stop-color="#007a70"/>
     </radialGradient>
 
     <style>
@@ -36,14 +26,14 @@
       .beaconCore { animation: beaconCorePulse 1.2s ease-in-out infinite; }
       .strobeL { animation: strobeFlash 2.3s steps(1) infinite; }
       .strobeR { animation: strobeFlash 2.3s steps(1) 0.15s infinite; }
-      .redNav { animation: navBlink 2s ease-in-out infinite; }
-      .greenNav { animation: navBlink 2s ease-in-out infinite 0.2s; }
-      .eyeLeft { animation: eyeBlink 4s ease-in-out infinite; }
-      .eyeRight { animation: eyeBlink 4s ease-in-out infinite 0.1s; }
+      .navLeft { animation: navBlink 2s ease-in-out infinite; }
+      .navRight { animation: navBlink 2s ease-in-out infinite 0.2s; }
+      /* Ambos os olhos com o mesmo timing — piscam juntos */
+      .eyes { animation: eyeBlink 4s ease-in-out infinite; }
 
       @keyframes beaconPulse {
-        0%, 100% { opacity: 0.2; r: 7; }
-        50% { opacity: 1; r: 11; }
+        0%, 100% { opacity: 0.2; }
+        50% { opacity: 1; }
       }
       @keyframes beaconCorePulse {
         0%, 100% { opacity: 0.6; }
@@ -66,88 +56,58 @@
   </defs>
 
   <!-- ═══ CORPO / ANEL PRINCIPAL ═══ -->
-  <!-- Sombra externa -->
   <ellipse cx="61" cy="75" rx="47" ry="44" fill="#000000" opacity="0.3"/>
-  <!-- Anel principal (cor sage green do original) -->
   <ellipse cx="60" cy="73" rx="47" ry="44" fill="#7a9e82"/>
-  <!-- Borda interna mais escura -->
   <ellipse cx="60" cy="73" rx="47" ry="44" fill="none" stroke="#5a7a60" stroke-width="2"/>
-  <!-- Destaque superior (reflexo) -->
   <ellipse cx="50" cy="53" rx="22" ry="10" fill="#a8c8a8" opacity="0.35" transform="rotate(-15 50 53)"/>
 
-  <!-- ═══ ORELHAS (protuberâncias laterais) ═══ -->
-  <!-- Orelha esquerda -->
+  <!-- ═══ ORELHAS ═══ -->
   <ellipse cx="14" cy="73" rx="8" ry="6" fill="#6a8e70"/>
   <ellipse cx="14" cy="73" rx="8" ry="6" fill="none" stroke="#4a6e50" stroke-width="1.5"/>
-  <!-- Orelha direita -->
   <ellipse cx="106" cy="73" rx="8" ry="6" fill="#6a8e70"/>
   <ellipse cx="106" cy="73" rx="8" ry="6" fill="none" stroke="#4a6e50" stroke-width="1.5"/>
 
   <!-- ═══ TELA / FACE ═══ -->
   <ellipse cx="60" cy="75" rx="34" ry="32" fill="#0a1a12"/>
   <ellipse cx="60" cy="75" rx="34" ry="32" fill="none" stroke="#1a3a22" stroke-width="1"/>
-  <!-- Reflexo na tela -->
-  <ellipse cx="48" cy="60" rx="8" ry="5" fill="#ffffff" opacity="0.04" transform="rotate(-20 48 60)"/>
 
-  <!-- ═══ OLHOS (acordado = círculos com brilho) ═══ -->
-  <g class="eyeLeft" style="transform-origin: 46px 74px">
-    <circle cx="46" cy="74" r="8" fill="url(#eyeGlow)"/>
-    <circle cx="46" cy="74" r="8" fill="none" stroke="#00ffee" stroke-width="0.5" opacity="0.6"/>
-    <!-- Pupila -->
-    <circle cx="46" cy="74" r="3.5" fill="#003a35"/>
-    <!-- Brilho -->
-    <circle cx="43" cy="71" r="2" fill="#ffffff" opacity="0.55"/>
-  </g>
-  <g class="eyeRight" style="transform-origin: 74px 74px">
-    <circle cx="74" cy="74" r="8" fill="url(#eyeGlow)"/>
-    <circle cx="74" cy="74" r="8" fill="none" stroke="#00ffee" stroke-width="0.5" opacity="0.6"/>
-    <!-- Pupila -->
-    <circle cx="74" cy="74" r="3.5" fill="#003a35"/>
-    <!-- Brilho -->
-    <circle cx="71" cy="71" r="2" fill="#ffffff" opacity="0.55"/>
+  <!-- ═══ OLHOS — ciano sólido, piscam juntos ═══ -->
+  <g class="eyes" style="transform-origin: 60px 74px">
+    <!-- Olho esquerdo -->
+    <circle cx="46" cy="74" r="8" fill="#00e5cc"/>
+    <circle cx="43" cy="71" r="2.2" fill="#ffffff" opacity="0.55"/>
+    <!-- Olho direito -->
+    <circle cx="74" cy="74" r="8" fill="#00e5cc"/>
+    <circle cx="71" cy="71" r="2.2" fill="#ffffff" opacity="0.55"/>
   </g>
 
-  <!-- ═══ ANTENA CENTRAL (beacon anti-colisão) ═══ -->
-  <!-- Haste -->
+  <!-- ═══ ANTENA CENTRAL (beacon anti-colisão laranja) ═══ -->
   <rect x="58" y="29" width="4" height="22" rx="2" fill="#6a8e70"/>
-  <!-- Corpo do beacon -->
   <circle cx="60" cy="26" r="5.5" fill="#cc4400"/>
   <circle cx="60" cy="26" r="4" fill="#ff6600"/>
-  <!-- Halo pulsante (beacon) -->
   <circle class="beacon" cx="60" cy="26" r="9" fill="url(#beacon)" opacity="0.6"/>
-  <!-- Núcleo brilhante -->
   <circle class="beaconCore" cx="60" cy="26" r="3" fill="#ffaa00"/>
   <circle cx="59" cy="25" r="1.2" fill="#ffffff" opacity="0.9"/>
 
-  <!-- ═══ ANTENA ESQUERDA (luz vermelha de navegação) ═══ -->
-  <!-- Braço curvo -->
-  <path d="M18 67 Q8 55 6 46" stroke="#5a7a60" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <!-- Corpo da luz -->
-  <circle cx="5" cy="43" r="5.5" fill="#880000"/>
-  <circle cx="5" cy="43" r="4" fill="#cc0000"/>
-  <!-- Halo vermelho -->
-  <circle class="redNav" cx="5" cy="43" r="8" fill="url(#redLight)" opacity="0.7"/>
-  <!-- Núcleo -->
-  <circle cx="5" cy="43" r="2.5" fill="#ff4444"/>
-  <circle cx="4" cy="42" r="1" fill="#ffffff" opacity="0.8"/>
-
-  <!-- ═══ ANTENA DIREITA (luz verde de navegação) ═══ -->
-  <!-- Braço curvo -->
+  <!-- ═══ ANTENA ESQUERDA DO ROBÔ = verde (esquerda de quem olha = direita da tela) ═══ -->
   <path d="M102 67 Q112 55 114 46" stroke="#5a7a60" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <!-- Corpo da luz -->
   <circle cx="115" cy="43" r="5.5" fill="#005500"/>
   <circle cx="115" cy="43" r="4" fill="#008800"/>
-  <!-- Halo verde -->
-  <circle class="greenNav" cx="115" cy="43" r="8" fill="url(#greenLight)" opacity="0.7"/>
-  <!-- Núcleo -->
+  <circle class="navRight" cx="115" cy="43" r="8" fill="url(#greenLight)" opacity="0.7"/>
   <circle cx="115" cy="43" r="2.5" fill="#00cc44"/>
   <circle cx="114" cy="42" r="1" fill="#ffffff" opacity="0.8"/>
 
+  <!-- ═══ ANTENA DIREITA DO ROBÔ = vermelha (direita de quem olha = esquerda da tela) ═══ -->
+  <path d="M18 67 Q8 55 6 46" stroke="#5a7a60" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="5" cy="43" r="5.5" fill="#880000"/>
+  <circle cx="5" cy="43" r="4" fill="#cc0000"/>
+  <circle class="navLeft" cx="5" cy="43" r="8" fill="url(#redLight)" opacity="0.7"/>
+  <circle cx="5" cy="43" r="2.5" fill="#ff4444"/>
+  <circle cx="4" cy="42" r="1" fill="#ffffff" opacity="0.8"/>
+
   <!-- ═══ STROBES (luz branca estroboscópica nas orelhas) ═══ -->
-  <!-- Strobe esquerdo -->
   <circle class="strobeL" cx="14" cy="73" r="7" fill="url(#strobeLight)" opacity="0.9"/>
   <circle class="strobeL" cx="14" cy="73" r="3" fill="#ffffff" opacity="0.95"/>
-  <!-- Strobe direito (ligeiramente defasado) -->
   <circle class="strobeR" cx="106" cy="73" r="7" fill="url(#strobeLight)" opacity="0.9"/>
   <circle class="strobeR" cx="106" cy="73" r="3" fill="#ffffff" opacity="0.95"/>
 </svg>
