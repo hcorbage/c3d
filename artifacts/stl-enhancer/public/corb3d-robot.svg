@@ -23,6 +23,7 @@
 
     <style>
       .beacon { animation: beaconPulse 1.2s ease-in-out infinite; }
+      .beacon2 { animation: beaconPulse2 1.2s ease-in-out infinite; }
       .beaconCore { animation: beaconCorePulse 1.2s ease-in-out infinite; }
       .strobeL { animation: strobeFlash 2.3s steps(1) infinite; }
       .strobeR { animation: strobeFlash 2.3s steps(1) 0.15s infinite; }
@@ -32,12 +33,19 @@
       .eyes { animation: eyeBlink 4s ease-in-out infinite; }
 
       @keyframes beaconPulse {
-        0%, 100% { opacity: 0.2; }
-        50% { opacity: 1; }
+        0%, 100% { opacity: 0; r: 8; }
+        45% { opacity: 0.95; r: 14; }
+        55% { opacity: 0.85; r: 16; }
+        70% { opacity: 0; r: 20; }
+      }
+      @keyframes beaconPulse2 {
+        0%, 100% { opacity: 0; r: 6; }
+        50% { opacity: 1; r: 10; }
+        65% { opacity: 0; r: 14; }
       }
       @keyframes beaconCorePulse {
-        0%, 100% { opacity: 0.6; }
-        50% { opacity: 1; }
+        0%, 100% { opacity: 0.3; fill: #cc0000; }
+        50% { opacity: 1; fill: #ffffff; }
       }
       @keyframes strobeFlash {
         0%, 8%, 100% { opacity: 1; }
@@ -85,7 +93,10 @@
   <rect x="58" y="29" width="4" height="22" rx="2" fill="#6a8e70"/>
   <circle cx="60" cy="26" r="5.5" fill="#880000"/>
   <circle cx="60" cy="26" r="4" fill="#cc0000"/>
-  <circle class="beacon" cx="60" cy="26" r="9" fill="url(#beacon)" opacity="0.6"/>
+  <!-- halo externo (expande e desvanece) -->
+  <circle class="beacon" cx="60" cy="26" r="9" fill="url(#beacon)"/>
+  <!-- halo interno (mais brilhante no pico) -->
+  <circle class="beacon2" cx="60" cy="26" r="6" fill="url(#beacon)"/>
   <circle class="beaconCore" cx="60" cy="26" r="3" fill="#ff2222"/>
   <circle cx="59" cy="25" r="1.2" fill="#ffffff" opacity="0.9"/>
 
