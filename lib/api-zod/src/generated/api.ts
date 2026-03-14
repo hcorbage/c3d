@@ -25,6 +25,10 @@ export const enhanceStlBodySmoothingIterationsMax = 20;
 
 export const enhanceStlBodyRemoveDuplicatesDefault = true;
 export const enhanceStlBodyFixNormalsDefault = true;
+export const enhanceStlBodyFillHolesDefault = true;
+export const enhanceStlBodyMaxHoleSizeDefault = 500;
+export const enhanceStlBodyMaxHoleSizeMin = 3;
+export const enhanceStlBodyMaxHoleSizeMax = 5000;
 
 export const EnhanceStlBody = zod.object({
   file: zod.instanceof(File).describe("STL file to enhance"),
@@ -42,6 +46,16 @@ export const EnhanceStlBody = zod.object({
     .boolean()
     .default(enhanceStlBodyFixNormalsDefault)
     .describe("Fix inverted\/inconsistent normals"),
+  fillHoles: zod
+    .boolean()
+    .default(enhanceStlBodyFillHolesDefault)
+    .describe("Fill open boundary loops (holes) in the mesh"),
+  maxHoleSize: zod
+    .number()
+    .min(enhanceStlBodyMaxHoleSizeMin)
+    .max(enhanceStlBodyMaxHoleSizeMax)
+    .default(enhanceStlBodyMaxHoleSizeDefault)
+    .describe("Maximum number of boundary edges in a hole to fill"),
 });
 
 /**

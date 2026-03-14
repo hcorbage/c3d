@@ -3,7 +3,7 @@ import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Upload, Box, Zap, Settings2, Download, 
-  Activity, Info, Layers, Maximize, AlertCircle, Eye, EyeOff
+  Activity, Info, Layers, Maximize, AlertCircle, Eye, EyeOff, ShieldCheck
 } from "lucide-react";
 import { useEnhanceStl, useGetStlStats } from "@workspace/api-client-react";
 import { StlViewer } from "@/components/StlViewer";
@@ -23,6 +23,7 @@ export default function Home() {
   const [smoothingIterations, setSmoothingIterations] = useState(3);
   const [removeDuplicates, setRemoveDuplicates] = useState(true);
   const [fixNormals, setFixNormals] = useState(true);
+  const [fillHoles, setFillHoles] = useState(true);
 
   const { toast } = useToast();
   
@@ -106,7 +107,8 @@ export default function Home() {
         file,
         smoothingIterations,
         removeDuplicates,
-        fixNormals
+        fixNormals,
+        fillHoles,
       }
     });
   };
@@ -272,7 +274,35 @@ export default function Home() {
             </div>
 
             <div className="space-y-8 flex-1">
-              
+
+              {/* Fill Holes — featured prominently */}
+              <div className={`p-4 rounded-2xl border transition-all duration-300 ${fillHoles ? 'bg-blue-500/10 border-blue-500/30' : 'bg-secondary/40 border-white/5'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="fill-holes">
+                      <ShieldCheck className="w-4 h-4 text-blue-400" />
+                      Fechar Buracos (Fill Holes)
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Detecta e fecha bordas abertas onde geometrias se encontram (ex: penas vs colete). Resolve erros de "bordas não múltiplas".
+                    </p>
+                  </div>
+                  <Switch 
+                    id="fill-holes" 
+                    checked={fillHoles} 
+                    onCheckedChange={setFillHoles} 
+                  />
+                </div>
+                {stats && !stats.isManifold && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-xl px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    Malha aberta detectada — ative esta opção para fechar os {stats.duplicateTriangles + stats.degenerateTriangles > 0 ? "buracos e " : ""}buracos da malha.
+                  </div>
+                )}
+              </div>
+
+              <div className="h-px w-full bg-border" />
+
               {/* Smoothing Slider */}
               <div className="space-y-4">
                 <div className="flex justify-between">

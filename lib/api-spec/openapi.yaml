@@ -56,6 +56,16 @@ paths:
                   type: boolean
                   default: true
                   description: Fix inverted/inconsistent normals
+                fillHoles:
+                  type: boolean
+                  default: true
+                  description: Fill open boundary loops (holes) in the mesh
+                maxHoleSize:
+                  type: integer
+                  minimum: 3
+                  maximum: 5000
+                  default: 500
+                  description: Maximum number of boundary edges in a hole to fill
               required:
                 - file
       responses:

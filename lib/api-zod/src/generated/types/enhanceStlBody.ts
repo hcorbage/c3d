@@ -19,4 +19,12 @@ export type EnhanceStlBody = {
   removeDuplicates?: boolean;
   /** Fix inverted/inconsistent normals */
   fixNormals?: boolean;
+  /** Fill open boundary loops (holes) in the mesh */
+  fillHoles?: boolean;
+  /**
+   * Maximum number of boundary edges in a hole to fill
+   * @minimum 3
+   * @maximum 5000
+   */
+  maxHoleSize?: number;
 };

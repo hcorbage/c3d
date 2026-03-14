@@ -138,6 +138,12 @@ export const enhanceStl = async (
   if (enhanceStlBody.fixNormals !== undefined) {
     formData.append(`fixNormals`, enhanceStlBody.fixNormals.toString());
   }
+  if (enhanceStlBody.fillHoles !== undefined) {
+    formData.append(`fillHoles`, enhanceStlBody.fillHoles.toString());
+  }
+  if (enhanceStlBody.maxHoleSize !== undefined) {
+    formData.append(`maxHoleSize`, enhanceStlBody.maxHoleSize.toString());
+  }
 
   return customFetch<Blob>(getEnhanceStlUrl(), {
     ...options,

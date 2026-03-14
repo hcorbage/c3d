@@ -3,6 +3,7 @@ import multer from "multer";
 import { parseStl, writeBinaryStl } from "../lib/stl-parser.js";
 import { computeStats } from "../lib/stl-stats.js";
 import { removeDuplicatesAndDegenerate, fixNormals, laplacianSmooth } from "../lib/stl-enhance.js";
+import { fillHoles } from "../lib/stl-fill-holes.js";
 
 const router: IRouter = Router();
 const upload = multer({
@@ -38,6 +39,8 @@ router.post("/stl/enhance", upload.single("file"), (req: Request, res: Response)
 
     const shouldRemoveDuplicates = req.body.removeDuplicates !== "false";
     const shouldFixNormals = req.body.fixNormals !== "false";
+    const shouldFillHoles = req.body.fillHoles !== "false";
+    const maxHoleSize = Math.min(5000, Math.max(3, parseInt(req.body.maxHoleSize ?? "500", 10) || 500));
     const smoothingIterations = Math.min(
       20,
       Math.max(0, parseInt(req.body.smoothingIterations ?? "3", 10) || 0)
@@ -46,6 +49,12 @@ router.post("/stl/enhance", upload.single("file"), (req: Request, res: Response)
     if (shouldRemoveDuplicates) {
       const result = removeDuplicatesAndDegenerate(triangles);
       triangles = result.triangles;
+    }
+
+    if (shouldFillHoles) {
+      const result = fillHoles(triangles, maxHoleSize);
+      triangles = result.triangles;
+      console.log(`Filled ${result.holesFilled} holes, added ${result.trianglesAdded} triangles`);
     }
 
     if (shouldFixNormals) {
