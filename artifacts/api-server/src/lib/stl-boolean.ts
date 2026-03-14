@@ -169,23 +169,54 @@ function isTriangleHiddenBy(
 }
 
 function findShells(triangles: Triangle[]): Map<number, number[]> {
+  // IMPORTANT: use EDGE-based connectivity, NOT vertex-based.
+  //
+  // Vertex-based union causes a critical false-negative: in character models, a
+  // feather mesh and the vest mesh often share vertex POSITIONS where they touch
+  // (their surfaces are coincident at the boundary). Vertex-based union would
+  // merge them into one shell → resolveIntersections sees 1 shell → bails out.
+  //
+  // Edge-based union only merges triangles that share a COMPLETE EDGE (both
+  // endpoint vertices match). Two meshes that merely touch at isolated vertex
+  // points remain separate shells, which is the correct geometric interpretation.
   const PREC = 1e4;
   const vk = (v: [number, number, number]) =>
     `${Math.round(v[0] * PREC)},${Math.round(v[1] * PREC)},${Math.round(v[2] * PREC)}`;
-  const parent = Array.from({ length: triangles.length }, (_, i) => i);
-  const find = (i: number): number =>
-    parent[i] === i ? i : (parent[i] = find(parent[i]));
-  const union = (a: number, b: number) => { parent[find(a)] = find(b); };
 
-  const vm = new Map<string, number[]>();
+  const edgeKey = (a: [number, number, number], b: [number, number, number]): string => {
+    const ka = vk(a), kb = vk(b);
+    return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+  };
+
+  const parent = Array.from({ length: triangles.length }, (_, i) => i);
+  const rank = new Array<number>(triangles.length).fill(0);
+  const find = (i: number): number => {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    return i;
+  };
+  const union = (a: number, b: number) => {
+    const ra = find(a), rb = find(b);
+    if (ra === rb) return;
+    if (rank[ra] < rank[rb]) parent[ra] = rb;
+    else if (rank[ra] > rank[rb]) parent[rb] = ra;
+    else { parent[rb] = ra; rank[ra]++; }
+  };
+
+  // Build edge → list of triangle indices using that edge
+  const edgeMap = new Map<string, number[]>();
   for (let i = 0; i < triangles.length; i++) {
-    for (const v of [triangles[i].v1, triangles[i].v2, triangles[i].v3]) {
-      const k = vk(v);
-      const a = vm.get(k);
-      if (a) a.push(i); else vm.set(k, [i]);
+    const { v1, v2, v3 } = triangles[i];
+    for (const [a, b] of [
+      [v1, v2], [v2, v3], [v3, v1],
+    ] as [[number, number, number], [number, number, number]][]) {
+      const k = edgeKey(a, b);
+      const arr = edgeMap.get(k);
+      if (arr) arr.push(i); else edgeMap.set(k, [i]);
     }
   }
-  for (const idxs of vm.values()) {
+
+  // Union triangles that share a FULL EDGE (not just a vertex point)
+  for (const idxs of edgeMap.values()) {
     for (let i = 1; i < idxs.length; i++) union(idxs[0], idxs[i]);
   }
 

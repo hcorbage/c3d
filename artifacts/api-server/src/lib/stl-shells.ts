@@ -13,21 +13,30 @@ export interface ShellInfo {
 
 /**
  * Detect connected shells (disconnected components) in the mesh.
- * Uses edge-adjacency to find connected components via Union-Find.
+ * Uses EDGE-adjacency (two shared vertices) via Union-Find.
+ *
+ * Edge-based is more accurate than vertex-based for character models:
+ * feathers/accessories often share only isolated vertex POINTS with the body
+ * mesh (touching but not welded). Vertex-based union merges them into one shell;
+ * edge-based correctly identifies them as separate shells.
  */
 export function detectShells(triangles: Triangle[]): ShellInfo {
   const n = triangles.length;
   if (n === 0) return { shellCount: 0, shells: [] };
 
-  // Build vertex → triangle index map
-  const vertToTris = new Map<string, number[]>();
+  const edgeKey = (a: Vec3, b: Vec3): string => {
+    const ka = vertKey(a), kb = vertKey(b);
+    return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+  };
 
+  // Build edge → triangle index list
+  const edgeToTris = new Map<string, number[]>();
   for (let i = 0; i < n; i++) {
     const { v1, v2, v3 } = triangles[i];
-    for (const v of [v1, v2, v3] as Vec3[]) {
-      const k = vertKey(v);
-      if (!vertToTris.has(k)) vertToTris.set(k, []);
-      vertToTris.get(k)!.push(i);
+    for (const [a, b] of [[v1, v2], [v2, v3], [v3, v1]] as [Vec3, Vec3][]) {
+      const k = edgeKey(a, b);
+      const arr = edgeToTris.get(k);
+      if (arr) arr.push(i); else edgeToTris.set(k, [i]);
     }
   }
 
@@ -52,16 +61,9 @@ export function detectShells(triangles: Triangle[]): ShellInfo {
     else { parent[rb] = ra; rank[ra]++; }
   }
 
-  // Union triangles that share a vertex
-  for (let i = 0; i < n; i++) {
-    const { v1, v2, v3 } = triangles[i];
-    for (const v of [v1, v2, v3] as Vec3[]) {
-      const k = vertKey(v);
-      const connected = vertToTris.get(k) ?? [];
-      for (const j of connected) {
-        if (j !== i) union(i, j);
-      }
-    }
+  // Union triangles that share a FULL EDGE (not just a vertex point)
+  for (const idxs of edgeToTris.values()) {
+    for (let i = 1; i < idxs.length; i++) union(idxs[0], idxs[i]);
   }
 
   // Group by root
