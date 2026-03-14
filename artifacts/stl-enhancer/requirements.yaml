@@ -1,0 +1,13 @@
+packages:
+  "three": "Required for 3D rendering of STL files"
+  "@types/three": "TypeScript definitions for Three.js"
+  "@react-three/fiber": "React wrapper for Three.js to render the 3D scene"
+  "@react-three/drei": "Useful helpers and abstractions for @react-three/fiber"
+  "framer-motion": "For smooth UI animations and transitions"
+  "react-dropzone": "For drag and drop file upload functionality"
+
+images: []
+
+notes:
+  - Application defaults to a dark mode "technical" theme.
+  - Three.js requires an object URL created from the File/Blob to load the STL.

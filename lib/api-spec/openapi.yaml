@@ -1,15 +1,16 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: STL Enhancer API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stl
+    description: STL enhancement operations
 paths:
   /healthz:
     get:
@@ -24,6 +25,90 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /stl/enhance:
+    post:
+      operationId: enhanceStl
+      tags: [stl]
+      summary: Enhance STL file
+      description: Upload an STL file and apply mesh improvements
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: STL file to enhance
+                smoothingIterations:
+                  type: integer
+                  minimum: 0
+                  maximum: 20
+                  default: 3
+                  description: Number of Laplacian smoothing passes
+                removeDuplicates:
+                  type: boolean
+                  default: true
+                  description: Remove duplicate vertices and degenerate triangles
+                fixNormals:
+                  type: boolean
+                  default: true
+                  description: Fix inverted/inconsistent normals
+              required:
+                - file
+      responses:
+        "200":
+          description: Enhanced STL file (binary)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Processing error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /stl/stats:
+    post:
+      operationId: getStlStats
+      tags: [stl]
+      summary: Get STL file statistics
+      description: Returns mesh statistics for an STL file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        "200":
+          description: Mesh statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StlStats"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +118,55 @@ components:
           type: string
       required:
         - status
-
+    StlStats:
+      type: object
+      properties:
+        triangleCount:
+          type: integer
+          description: Number of triangles in the mesh
+        vertexCount:
+          type: integer
+          description: Number of vertices
+        boundingBox:
+          type: object
+          properties:
+            minX: { type: number }
+            minY: { type: number }
+            minZ: { type: number }
+            maxX: { type: number }
+            maxY: { type: number }
+            maxZ: { type: number }
+          required: [minX, minY, minZ, maxX, maxY, maxZ]
+        volume:
+          type: number
+          description: Approximate volume
+        surfaceArea:
+          type: number
+          description: Total surface area
+        isManifold:
+          type: boolean
+          description: Whether the mesh is watertight/manifold
+        duplicateTriangles:
+          type: integer
+          description: Number of duplicate triangles found
+        degenerateTriangles:
+          type: integer
+          description: Number of degenerate (zero-area) triangles
+      required:
+        - triangleCount
+        - vertexCount
+        - boundingBox
+        - volume
+        - surfaceArea
+        - isManifold
+        - duplicateTriangles
+        - degenerateTriangles
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+      required:
+        - error

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "STL Enhancer"
+version = "1.0.0"
+id = "artifacts/stl-enhancer"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 24946
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/stl-enhancer run dev"
+
+[services.env]
+PORT = "24946"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/stl-enhancer", "run", "build"]
+publicDir = "artifacts/stl-enhancer/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
