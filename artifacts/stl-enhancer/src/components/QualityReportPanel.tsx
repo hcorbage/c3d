@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle2, AlertTriangle, TrendingDown, Layers, GitMerge, Shield, Minus } from "lucide-react";
+import { CheckCircle2, AlertTriangle, TrendingDown, GitMerge, Shield, Minus, Layers } from "lucide-react";
 import type { QualityReport } from "@workspace/api-client-react";
 import { useLanguage } from "@/i18n/LanguageContext";
 
@@ -28,6 +28,7 @@ export function QualityReportPanel({ report }: Props) {
     { count: fixes.degeneratesRemoved, label: t.report.degeneratesRemoved, icon: <Minus size={13} className="text-yellow-400" /> },
     { count: fixes.trianglesReduced, label: t.report.trianglesReduced, icon: <TrendingDown size={13} className="text-purple-400" /> },
     { count: fixes.shellsMerged, label: t.report.shellsMerged, icon: <GitMerge size={13} className="text-cyan-400" /> },
+    { count: fixes.intersectionsResolved ?? 0, label: t.report.intersectionsResolved, icon: <Layers size={13} className="text-orange-400" /> },
   ].filter(e => e.count > 0);
 
   const totalIssues = fixEntries.reduce((s, e) => s + e.count, 0);

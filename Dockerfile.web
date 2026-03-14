@@ -1,0 +1,28 @@
+FROM node:20-alpine AS builder
+RUN apk add --no-cache python3 make g++
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml ./
+COPY artifacts/stl-enhancer/package.json ./artifacts/stl-enhancer/
+COPY lib/api-client-react/package.json ./lib/api-client-react/
+COPY lib/api-schemas/package.json ./lib/api-schemas/
+
+RUN pnpm install --frozen-lockfile
+
+COPY lib/api-schemas ./lib/api-schemas
+COPY lib/api-client-react ./lib/api-client-react
+COPY artifacts/stl-enhancer ./artifacts/stl-enhancer
+
+ENV PORT=3000
+ENV BASE_PATH=/
+ENV NODE_ENV=production
+
+RUN pnpm --filter @workspace/stl-enhancer run build
+
+FROM nginx:1.25-alpine AS runner
+COPY --from=builder /app/artifacts/stl-enhancer/dist/public /usr/share/nginx/html
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80

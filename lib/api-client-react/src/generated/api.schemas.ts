@@ -51,6 +51,7 @@ export interface QualityReportFixes {
   degeneratesRemoved: number;
   trianglesReduced: number;
   shellsMerged: number;
+  intersectionsResolved: number;
 }
 
 export interface QualityReport {
@@ -79,6 +80,7 @@ export type EnhanceStlBody = {
   mergeShells?: boolean;
   decimate?: boolean;
   decimateRatio?: number;
+  resolveIntersections?: boolean;
 };
 
 export type GetStlStatsBody = {

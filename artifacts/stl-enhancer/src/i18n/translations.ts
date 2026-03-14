@@ -55,6 +55,8 @@ export const translations = {
       decimateDesc: "Reduces triangle count while preserving shape. Ideal for AI-generated models with millions of polygons.",
       decimateRatio: "Reduction",
       decimateTooltip: "Removes a percentage of triangles using voxel-grid clustering. A 50% reduction is a good starting point — it cuts file size and speeds up slicing without visible loss. High reduction (80%+) may lose fine detail.",
+      resolveIntersections: "Resolve Intersections",
+      resolveIntersectionsDesc: "Removes faces that are hidden inside other shells. Lets you paint each part separately in your slicer without colors bleeding between parts.",
     },
     report: {
       title: "Quality Report",
@@ -74,6 +76,7 @@ export const translations = {
       degeneratesRemoved: "degenerate triangles removed",
       trianglesReduced: "triangles removed (decimation)",
       shellsMerged: "shells merged",
+      intersectionsResolved: "internal faces removed",
       noIssues: "No issues found — mesh was already clean!",
     },
     actions: {
@@ -120,6 +123,7 @@ export const translations = {
       costBase: "Basic repair",
       costMerge: "Merge Shells",
       costDecimate: "Decimation",
+      costResolve: "Resolve Intersections",
       creditSingular: "credit",
       creditPlural: "credits",
       totalCost: "Total to use:",
@@ -181,6 +185,8 @@ export const translations = {
       decimateDesc: "Reduz a quantidade de triângulos preservando a forma. Ideal para modelos de IA com milhões de polígonos.",
       decimateRatio: "Redução",
       decimateTooltip: "Remove uma porcentagem de triângulos usando agrupamento por grade de voxels. Uma redução de 50% é um bom ponto de partida — reduz o tamanho do arquivo e acelera o fatiamento sem perda visível. Alta redução (80%+) pode perder detalhes finos.",
+      resolveIntersections: "Resolver Interseções",
+      resolveIntersectionsDesc: "Remove as faces escondidas dentro de outras cascas. Permite pintar cada parte separadamente no fatiador sem as cores invadirem partes vizinhas.",
     },
     report: {
       title: "Relatório de Qualidade",
@@ -200,6 +206,7 @@ export const translations = {
       degeneratesRemoved: "triângulos degenerados removidos",
       trianglesReduced: "triângulos removidos (decimação)",
       shellsMerged: "cascas mescladas",
+      intersectionsResolved: "faces internas removidas",
       noIssues: "Nenhum problema encontrado — a malha já estava limpa!",
     },
     actions: {
@@ -246,6 +253,7 @@ export const translations = {
       costBase: "Reparo básico",
       costMerge: "Mesclar Cascas",
       costDecimate: "Decimação",
+      costResolve: "Resolver Interseções",
       creditSingular: "crédito",
       creditPlural: "créditos",
       totalCost: "Total a usar:",

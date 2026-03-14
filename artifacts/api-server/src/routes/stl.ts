@@ -6,6 +6,7 @@ import { removeDuplicatesAndDegenerate, fixNormals, laplacianSmooth } from "../l
 import { fillHoles } from "../lib/stl-fill-holes.js";
 import { detectShells, mergeShells } from "../lib/stl-shells.js";
 import { decimateMesh } from "../lib/stl-decimate.js";
+import { resolveIntersections } from "../lib/stl-boolean.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { db, usersTable, creditTransactionsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
@@ -35,7 +36,11 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     const isAdmin = req.user!.isAdmin;
     const shouldMergeShellsEarly = req.body.mergeShells === "true";
     const shouldDecimateEarly = req.body.decimate === "true";
-    const creditCost = 1 + (shouldMergeShellsEarly ? 1 : 0) + (shouldDecimateEarly ? 1 : 0);
+    const shouldResolveEarly = req.body.resolveIntersections === "true";
+    const creditCost = 1
+      + (shouldMergeShellsEarly ? 1 : 0)
+      + (shouldDecimateEarly ? 1 : 0)
+      + (shouldResolveEarly ? 1 : 0);
 
     if (!isAdmin) {
       const [userRow] = await db.select({ credits: usersTable.credits }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
@@ -54,6 +59,7 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     const shouldFillHoles = req.body.fillHoles !== "false";
     const shouldMergeShells = req.body.mergeShells === "true";
     const shouldDecimate = req.body.decimate === "true";
+    const shouldResolveIntersections = req.body.resolveIntersections === "true";
     const decimateRatio = Math.min(0.95, Math.max(0.05, parseFloat(req.body.decimateRatio ?? "0.5") || 0.5));
     const maxHoleSize = Math.min(5000, Math.max(3, parseInt(req.body.maxHoleSize ?? "500", 10) || 500));
     const smoothingIterations = Math.min(20, Math.max(0, parseInt(req.body.smoothingIterations ?? "3", 10) || 0));
@@ -69,6 +75,7 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       degeneratesRemoved: 0,
       trianglesReduced: 0,
       shellsMerged: 0,
+      intersectionsResolved: 0,
     };
 
     if (shouldRemoveDuplicates) {
@@ -102,6 +109,18 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       triangles = result.triangles;
     }
 
+    if (shouldResolveIntersections) {
+      const result = resolveIntersections(triangles);
+      fixes.intersectionsResolved = result.resolved;
+      triangles = result.triangles;
+      // Re-fill holes created by the intersection removal
+      if (result.resolved > 0) {
+        const refill = fillHoles(triangles, maxHoleSize);
+        fixes.holesFilled += refill.holesFilled;
+        triangles = refill.triangles;
+      }
+    }
+
     if (smoothingIterations > 0) {
       triangles = laplacianSmooth(triangles, smoothingIterations);
     }
@@ -118,7 +137,12 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
         userId: req.user!.id,
         amount: -creditCost,
         type: "use",
-        description: "STL enhancement",
+        description: [
+          `Reparo básico (${creditCost} crédito${creditCost > 1 ? "s" : ""})`,
+          shouldMergeShells ? "mesclar cascas" : "",
+          shouldDecimate ? `decimação ${Math.round(decimateRatio * 100)}%` : "",
+          shouldResolveIntersections ? "resolver interseções" : "",
+        ].filter(Boolean).join(" + "),
       });
     }
 

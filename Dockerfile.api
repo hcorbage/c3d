@@ -1,0 +1,39 @@
+FROM node:20-alpine AS base
+RUN apk add --no-cache python3 make g++
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml ./
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY lib/db/package.json ./lib/db/
+COPY lib/api-schemas/package.json ./lib/api-schemas/
+
+RUN pnpm install --frozen-lockfile
+
+COPY lib/db ./lib/db
+COPY lib/api-schemas ./lib/api-schemas
+COPY artifacts/api-server ./artifacts/api-server
+
+RUN pnpm --filter @workspace/api-server run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN npm install -g pnpm@9
+
+COPY package.json pnpm-workspace.yaml ./
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY lib/db/package.json ./lib/db/
+COPY lib/api-schemas/package.json ./lib/api-schemas/
+
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=base /app/artifacts/api-server/dist ./artifacts/api-server/dist
+
+ENV NODE_ENV=production
+ENV PORT=3001
+
+EXPOSE 3001
+
+CMD ["node", "artifacts/api-server/dist/index.cjs"]

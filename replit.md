@@ -16,84 +16,132 @@ Professional 3D mesh repair and optimization tool. pnpm workspace monorepo using
 - **Payments**: Stripe Checkout (standard SDK, no Replit-specific integration)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Build**: esbuild (CJS bundle for API, Vite for frontend)
 - **Frontend**: React + Vite, Tailwind CSS, framer-motion, Three.js (@react-three/fiber)
+- **Deployment**: Docker + nginx (see `docker-compose.prod.yml`)
+
+## Features
+
+### Mesh Enhancement Options
+- **Fill Holes** — detects and closes open boundary edges (included in base credit)
+- **Fix Normals** — recalculates inverted faces (included)
+- **Remove Duplicates** — cleans zero-area triangles and overlapping vertices (included)
+- **Laplacian Smoothing** — smooths rough edges (0–20 passes, included)
+- **Merge Shells** — welds disconnected bodies into one solid (+1 credit)
+- **Decimate** — reduces triangle count with voxel-grid clustering (+1 credit)
+- **Resolve Intersections** — removes faces hidden inside other shells (+1 credit)
+- **Quality Report Panel** — before/after stats, fixes applied, unit detection
+
+### Credit System
+- Base repair: 1 credit
+- +1 for Merge Shells, +1 for Decimate, +1 for Resolve Intersections (max 4 credits/operation)
+- Credit packages: 10=R$9.90 / 40=R$34.90 (Popular) / 100=R$79.90
+- New users receive 3 free credits
+- Admin user (`ADMIN_USERNAME`) has unlimited credits
+
+### Auth
+- JWT stored in localStorage
+- Admin: `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars
+- New user registration gives 3 free credits
+
+## Environment Variables
+
+| Variable | Description |
+|---|---|
+| `PORT` | Server listen port |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | JWT signing secret |
+| `ADMIN_USERNAME` | Admin login name (default: hcorbage) |
+| `ADMIN_PASSWORD` | Admin login password |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 
 ## Structure
 
 ```text
 artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
+├── artifacts/
+│   ├── api-server/         # Express API server
+│   └── stl-enhancer/       # React + Vite frontend
+├── lib/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+├── scripts/                # Utility scripts
+├── nginx/nginx.conf         # nginx reverse-proxy config
+├── Dockerfile.api           # API Docker build
+├── Dockerfile.web           # Frontend Docker build (nginx static serve)
+├── docker-compose.prod.yml  # Production orchestration
+├── .env.example             # Environment variable template
+├── deploy.sh                # VPS deployment helper script
+├── pnpm-workspace.yaml
+└── tsconfig.json
 ```
 
-## TypeScript & Composite Projects
+## Deployment (Hostinger VPS)
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+1. Copy `.env.example` to `.env` and fill all values
+2. Run `./deploy.sh` — builds images, runs migrations, starts services
+3. App runs on port 80; use `certbot --nginx -d yourdomain.com` for HTTPS
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+nginx routes:
+- `/api/*` → API server container (port 3001)
+- `/*` → static frontend files with SPA fallback
 
-## Root Scripts
+## STL Processing Pipeline
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+`artifacts/api-server/src/lib/`:
+- `stl-parser.ts` — binary/ASCII STL parse + write
+- `stl-stats.ts` — triangle/vertex/shell/open-edge/manifold/unit stats
+- `stl-enhance.ts` — remove duplicates, fix normals, Laplacian smoothing
+- `stl-fill-holes.ts` — boundary edge detection + fan-fill
+- `stl-shells.ts` — Union-Find shell detection + merge
+- `stl-decimate.ts` — voxel-grid clustering decimation
+- `stl-boolean.ts` — Möller-Trumbore ray-triangle intersection + centroid test to remove internal faces
 
 ## Packages
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+Express 5 API server.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+- App setup: `src/app.ts` — CORS, JSON/urlencoded, routes at `/api`
+- Routes: `src/routes/stl.ts` (enhance + stats), `src/routes/credits.ts`, `src/routes/auth.ts`
+- Build: `pnpm --filter @workspace/api-server run build` → `dist/index.cjs`
+
+### `artifacts/stl-enhancer` (`@workspace/stl-enhancer`)
+
+React + Vite frontend. Bilingual (EN/PT-BR).
+
+- `src/pages/Home.tsx` — main UI, all options, credit cost summary
+- `src/components/QualityReportPanel.tsx` — before/after stats + fixes
+- `src/components/CreditsModal.tsx` — credit purchase modal
+- `src/i18n/translations.ts` — all UI strings in EN + PT-BR
+- Vite build requires `PORT` and `BASE_PATH` env vars
+- Build output: `dist/public/`
 
 ### `lib/db` (`@workspace/db`)
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+Drizzle ORM. Tables: `users`, `credit_transactions`.
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
+- Push schema: `pnpm --filter @workspace/db run push`
 
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+### `lib/api-spec` / `lib/api-client-react` / `lib/api-zod`
 
-### `lib/api-spec` (`@workspace/api-spec`)
+OpenAPI spec, generated React Query hooks, generated Zod schemas.
 
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+- Regenerate: `pnpm --filter @workspace/api-spec run codegen`
 
 ### `scripts` (`@workspace/scripts`)
 
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+Utility scripts. Run via `pnpm --filter @workspace/scripts run <script>`.
+
+## TypeScript Notes
+
+- All packages use `composite: true` extending `tsconfig.base.json`
+- Typecheck from root: `pnpm run typecheck`
+- `emitDeclarationOnly` — JS bundling via esbuild/Vite, not tsc
+- Use `bcryptjs` (NOT native `bcrypt`) for compatibility
+- Drizzle atomic increments via `sql` template tag: `sql\`${table.col} + ${n}\``

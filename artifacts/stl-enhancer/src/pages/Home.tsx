@@ -64,9 +64,10 @@ export default function Home() {
   const [mergeShells, setMergeShells] = useState(false);
   const [decimate, setDecimate] = useState(false);
   const [decimateRatio, setDecimateRatio] = useState(50);
+  const [resolveIntersections, setResolveIntersections] = useState(false);
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
 
-  const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0);
+  const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0) + (resolveIntersections ? 1 : 0);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -211,6 +212,7 @@ export default function Home() {
         mergeShells,
         decimate,
         decimateRatio: decimate ? decimateRatio / 100 : undefined,
+        resolveIntersections,
       }
     });
   };
@@ -651,6 +653,19 @@ export default function Home() {
                 )}
               </div>
 
+              {/* Resolve Intersections */}
+              <div className={`p-4 rounded-2xl border transition-all duration-300 ${resolveIntersections ? 'bg-orange-500/10 border-orange-500/30' : 'bg-secondary/40 border-white/5'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="resolve-intersections">
+                    <Layers className="w-4 h-4 text-orange-400" />
+                    {t.options.resolveIntersections}
+                    <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="orange" />
+                  </Label>
+                  <Switch id="resolve-intersections" checked={resolveIntersections} onCheckedChange={setResolveIntersections} />
+                </div>
+                <p className="text-xs text-muted-foreground">{t.options.resolveIntersectionsDesc}</p>
+              </div>
+
             </div>
 
             {/* Action Button */}
@@ -665,7 +680,7 @@ export default function Home() {
               </button>
             ) : !user.isAdmin && user.credits < totalCredits ? (
               <div className="mt-8 space-y-3">
-                <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} />
+                <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} resolveIntersections={resolveIntersections} />
                 <button
                   onClick={() => setShowCreditsModal(true)}
                   className="w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-all duration-300"
@@ -677,7 +692,7 @@ export default function Home() {
             ) : (
               <div className="mt-8 space-y-3">
                 {user && !user.isAdmin && (
-                  <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} />
+                  <CreditCostSummary totalCredits={totalCredits} mergeShells={mergeShells} decimate={decimate} resolveIntersections={resolveIntersections} />
                 )}
                 <button
                   onClick={handleEnhance}
@@ -729,11 +744,12 @@ export default function Home() {
   );
 }
 
-function CreditBadge({ label, color = "blue" }: { label: string; color?: "blue" | "cyan" | "purple" | "gray" }) {
+function CreditBadge({ label, color = "blue" }: { label: string; color?: "blue" | "cyan" | "purple" | "orange" | "gray" }) {
   const colors = {
     blue:   "bg-blue-500/15 text-blue-300 border-blue-500/20",
     cyan:   "bg-cyan-500/15 text-cyan-300 border-cyan-500/20",
     purple: "bg-purple-500/15 text-purple-300 border-purple-500/20",
+    orange: "bg-orange-500/15 text-orange-300 border-orange-500/20",
     gray:   "bg-white/5 text-muted-foreground border-white/10",
   };
   return (
@@ -743,7 +759,7 @@ function CreditBadge({ label, color = "blue" }: { label: string; color?: "blue" 
   );
 }
 
-function CreditCostSummary({ totalCredits, mergeShells, decimate }: { totalCredits: number; mergeShells: boolean; decimate: boolean }) {
+function CreditCostSummary({ totalCredits, mergeShells, decimate, resolveIntersections }: { totalCredits: number; mergeShells: boolean; decimate: boolean; resolveIntersections: boolean }) {
   const { t } = useLanguage();
   const label = totalCredits === 1 ? t.credits.creditSingular : t.credits.creditPlural;
   return (
@@ -770,11 +786,21 @@ function CreditCostSummary({ totalCredits, mergeShells, decimate }: { totalCredi
             <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="purple" />
           </div>
         )}
+        {resolveIntersections && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-orange-300">{t.credits.costResolve}</span>
+            <CreditBadge label={`+1 ${t.credits.creditSingular}`} color="orange" />
+          </div>
+        )}
       </div>
       <div className="h-px bg-border" />
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-foreground">{t.credits.totalCost}</span>
-        <span className={`text-base font-black font-mono ${totalCredits === 3 ? 'text-purple-400' : totalCredits === 2 ? 'text-cyan-400' : 'text-blue-400'}`}>
+        <span className={`text-base font-black font-mono ${
+          totalCredits >= 4 ? 'text-orange-400' :
+          totalCredits === 3 ? 'text-purple-400' :
+          totalCredits === 2 ? 'text-cyan-400' : 'text-blue-400'
+        }`}>
           {totalCredits} {label}
         </span>
       </div>
