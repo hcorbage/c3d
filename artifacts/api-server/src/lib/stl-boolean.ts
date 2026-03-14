@@ -168,6 +168,207 @@ function isTriangleHiddenBy(
   return isInsideMesh(m3x, m3y, m3z, gX, gY, gZ); // centroid + midpoint 3 ✓
 }
 
+// ─── Möller 1997 triangle-triangle intersection test ──────────────────────────
+// Returns true when two non-coplanar, non-adjacent triangles geometrically
+// cross each other. Uses the full interval-overlap test (no false positives).
+type Vec3 = [number, number, number];
+
+function triTriIntersect(
+  p0: Vec3, p1: Vec3, p2: Vec3,
+  q0: Vec3, q1: Vec3, q2: Vec3,
+): boolean {
+  const EPS = 1e-7;
+
+  // Plane of T2
+  const n2x = (q1[1]-q0[1])*(q2[2]-q0[2]) - (q1[2]-q0[2])*(q2[1]-q0[1]);
+  const n2y = (q1[2]-q0[2])*(q2[0]-q0[0]) - (q1[0]-q0[0])*(q2[2]-q0[2]);
+  const n2z = (q1[0]-q0[0])*(q2[1]-q0[1]) - (q1[1]-q0[1])*(q2[0]-q0[0]);
+  const d2  = n2x*q0[0] + n2y*q0[1] + n2z*q0[2];
+  const dp0 = n2x*p0[0] + n2y*p0[1] + n2z*p0[2] - d2;
+  const dp1 = n2x*p1[0] + n2y*p1[1] + n2z*p1[2] - d2;
+  const dp2 = n2x*p2[0] + n2y*p2[1] + n2z*p2[2] - d2;
+  if (dp0 > EPS && dp1 > EPS && dp2 > EPS) return false;
+  if (dp0 < -EPS && dp1 < -EPS && dp2 < -EPS) return false;
+
+  // Plane of T1
+  const n1x = (p1[1]-p0[1])*(p2[2]-p0[2]) - (p1[2]-p0[2])*(p2[1]-p0[1]);
+  const n1y = (p1[2]-p0[2])*(p2[0]-p0[0]) - (p1[0]-p0[0])*(p2[2]-p0[2]);
+  const n1z = (p1[0]-p0[0])*(p2[1]-p0[1]) - (p1[1]-p0[1])*(p2[0]-p0[0]);
+  const d1  = n1x*p0[0] + n1y*p0[1] + n1z*p0[2];
+  const dq0 = n1x*q0[0] + n1y*q0[1] + n1z*q0[2] - d1;
+  const dq1 = n1x*q1[0] + n1y*q1[1] + n1z*q1[2] - d1;
+  const dq2 = n1x*q2[0] + n1y*q2[1] + n1z*q2[2] - d1;
+  if (dq0 > EPS && dq1 > EPS && dq2 > EPS) return false;
+  if (dq0 < -EPS && dq1 < -EPS && dq2 < -EPS) return false;
+
+  // Intersection line direction D = N1 × N2
+  const Dx = n1y*n2z - n1z*n2y;
+  const Dy = n1z*n2x - n1x*n2z;
+  const Dz = n1x*n2y - n1y*n2x;
+  // Degenerate (coplanar triangles) → skip
+  if (Math.abs(Dx) + Math.abs(Dy) + Math.abs(Dz) < EPS) return false;
+
+  // Project T1 vertices onto D
+  const pD0 = Dx*p0[0] + Dy*p0[1] + Dz*p0[2];
+  const pD1 = Dx*p1[0] + Dy*p1[1] + Dz*p1[2];
+  const pD2 = Dx*p2[0] + Dy*p2[1] + Dz*p2[2];
+  // Project T2 vertices onto D
+  const qD0 = Dx*q0[0] + Dy*q0[1] + Dz*q0[2];
+  const qD1 = Dx*q1[0] + Dy*q1[1] + Dz*q1[2];
+  const qD2 = Dx*q2[0] + Dy*q2[1] + Dz*q2[2];
+
+  // Compute intersection interval for T1 on D
+  const sp = [dp0 >= 0 ? 1 : -1, dp1 >= 0 ? 1 : -1, dp2 >= 0 ? 1 : -1];
+  let t1lo: number, t1hi: number;
+  if (sp[0] !== sp[1] && sp[0] !== sp[2]) {
+    t1lo = pD0 + (pD1 - pD0) * dp0 / (dp0 - dp1);
+    t1hi = pD0 + (pD2 - pD0) * dp0 / (dp0 - dp2);
+  } else if (sp[1] !== sp[0] && sp[1] !== sp[2]) {
+    t1lo = pD1 + (pD0 - pD1) * dp1 / (dp1 - dp0);
+    t1hi = pD1 + (pD2 - pD1) * dp1 / (dp1 - dp2);
+  } else {
+    if (Math.abs(dp0) + Math.abs(dp1) + Math.abs(dp2) < EPS) return false;
+    const denom0 = dp2 - dp0, denom1 = dp2 - dp1;
+    if (Math.abs(denom0) < EPS || Math.abs(denom1) < EPS) return false;
+    t1lo = pD2 + (pD0 - pD2) * dp2 / denom0;
+    t1hi = pD2 + (pD1 - pD2) * dp2 / denom1;
+  }
+  if (t1lo > t1hi) { const tmp = t1lo; t1lo = t1hi; t1hi = tmp; }
+
+  // Compute intersection interval for T2 on D
+  const sq = [dq0 >= 0 ? 1 : -1, dq1 >= 0 ? 1 : -1, dq2 >= 0 ? 1 : -1];
+  let t2lo: number, t2hi: number;
+  if (sq[0] !== sq[1] && sq[0] !== sq[2]) {
+    t2lo = qD0 + (qD1 - qD0) * dq0 / (dq0 - dq1);
+    t2hi = qD0 + (qD2 - qD0) * dq0 / (dq0 - dq2);
+  } else if (sq[1] !== sq[0] && sq[1] !== sq[2]) {
+    t2lo = qD1 + (qD0 - qD1) * dq1 / (dq1 - dq0);
+    t2hi = qD1 + (qD2 - qD1) * dq1 / (dq1 - dq2);
+  } else {
+    if (Math.abs(dq0) + Math.abs(dq1) + Math.abs(dq2) < EPS) return false;
+    const denom0 = dq2 - dq0, denom1 = dq2 - dq1;
+    if (Math.abs(denom0) < EPS || Math.abs(denom1) < EPS) return false;
+    t2lo = qD2 + (qD0 - qD2) * dq2 / denom0;
+    t2hi = qD2 + (qD1 - qD2) * dq2 / denom1;
+  }
+  if (t2lo > t2hi) { const tmp = t2lo; t2lo = t2hi; t2hi = tmp; }
+
+  // Intervals overlap → triangles intersect
+  return t1lo <= t2hi + EPS && t2lo <= t1hi + EPS;
+}
+
+// ─── Self-intersection removal for single-shell models ────────────────────────
+// For meshes where different parts (e.g. feather + vest) are merged into one
+// topological shell, uses the Möller test to find triangles that geometrically
+// cross each other (they don't just touch at shared vertices/edges — they
+// actually pierce through each other). Removes all crossing triangles.
+//
+// After removal the mesh has open holes at each crossing zone. FillHoles then
+// caps those holes, producing clean boundaries. If the removed zone was the
+// ONLY connection between two parts, detectShells will now see them as separate
+// shells, enabling multi-color painting in BambuLab / Orca Slicer.
+function removeSelfIntersections(
+  triangles: Triangle[],
+): { triangles: Triangle[]; resolved: number } {
+  if (triangles.length < 4) return { triangles, resolved: 0 };
+
+  const n = triangles.length;
+  const PREC = 1e4;
+  const vk4 = (v: readonly number[]) =>
+    `${Math.round(v[0] * PREC)},${Math.round(v[1] * PREC)},${Math.round(v[2] * PREC)}`;
+
+  // Precompute numeric vertex IDs for O(1) adjacency checking
+  const vertIDMap = new Map<string, number>();
+  let nextVID = 0;
+  const triVIDs = new Array<[number, number, number]>(n);
+  for (let i = 0; i < n; i++) {
+    const { v1, v2, v3 } = triangles[i];
+    const gid = (v: readonly number[]): number => {
+      const k = vk4(v);
+      let id = vertIDMap.get(k);
+      if (id === undefined) { id = nextVID++; vertIDMap.set(k, id); }
+      return id;
+    };
+    triVIDs[i] = [gid(v1), gid(v2), gid(v3)];
+  }
+
+  const adjacent = (i: number, j: number): boolean => {
+    const [ia, ib, ic] = triVIDs[i];
+    const [ja, jb, jc] = triVIDs[j];
+    return ia===ja||ia===jb||ia===jc||
+           ib===ja||ib===jb||ib===jc||
+           ic===ja||ic===jb||ic===jc;
+  };
+
+  // 3-D spatial hash grid
+  const aabb = meshAABB(triangles);
+  const GRID = 32;
+  const sX = Math.max(1e-9, aabb.maxX - aabb.minX);
+  const sY = Math.max(1e-9, aabb.maxY - aabb.minY);
+  const sZ = Math.max(1e-9, aabb.maxZ - aabb.minZ);
+  const cellIdx = (v: number, span: number, min: number) =>
+    Math.max(0, Math.min(GRID - 1, Math.floor((v - min) / span * GRID)));
+
+  const cellTris = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const { v1, v2, v3 } = triangles[i];
+    const cxLo = cellIdx(Math.min(v1[0], v2[0], v3[0]), sX, aabb.minX);
+    const cxHi = cellIdx(Math.max(v1[0], v2[0], v3[0]), sX, aabb.minX);
+    const cyLo = cellIdx(Math.min(v1[1], v2[1], v3[1]), sY, aabb.minY);
+    const cyHi = cellIdx(Math.max(v1[1], v2[1], v3[1]), sY, aabb.minY);
+    const czLo = cellIdx(Math.min(v1[2], v2[2], v3[2]), sZ, aabb.minZ);
+    const czHi = cellIdx(Math.max(v1[2], v2[2], v3[2]), sZ, aabb.minZ);
+    for (let cx = cxLo; cx <= cxHi; cx++)
+      for (let cy = cyLo; cy <= cyHi; cy++)
+        for (let cz = czLo; cz <= czHi; cz++) {
+          const key = cx * GRID * GRID + cy * GRID + cz;
+          const arr = cellTris.get(key);
+          if (arr) arr.push(i); else cellTris.set(key, [i]);
+        }
+  }
+
+  const toRemove = new Set<number>();
+  // Intentionally no global pair-dedup set: storing up to n² pair keys would
+  // exhaust memory for large (1M-tri) models. Pairs spanning multiple cells may
+  // be checked a few extra times — safe because triTriIntersect is idempotent
+  // and the result set absorbs duplicates.
+  let pairsChecked = 0;
+
+  for (const cellList of cellTris.values()) {
+    if (cellList.length < 2) continue;
+    // Cap per-cell density to avoid O(k²) blowup in ultra-dense zones
+    const limit = Math.min(cellList.length, 80);
+    for (let a = 0; a < limit; a++) {
+      const i = cellList[a];
+      if (toRemove.has(i)) continue; // already marked — skip inner loop early
+      for (let b = a + 1; b < limit; b++) {
+        const j = cellList[b];
+        if (toRemove.has(j)) continue;
+        pairsChecked++;
+        if (adjacent(i, j)) continue;
+        const T1 = triangles[i], T2 = triangles[j];
+        if (triTriIntersect(
+          T1.v1 as Vec3, T1.v2 as Vec3, T1.v3 as Vec3,
+          T2.v1 as Vec3, T2.v2 as Vec3, T2.v3 as Vec3,
+        )) {
+          toRemove.add(i);
+          toRemove.add(j);
+        }
+      }
+    }
+  }
+
+  console.log(
+    `[removeSelfIntersections] checked ${pairsChecked} pairs → ` +
+    `${toRemove.size} self-intersecting triangles removed`,
+  );
+
+  return {
+    triangles: triangles.filter((_, i) => !toRemove.has(i)),
+    resolved: toRemove.size,
+  };
+}
+
 function findShells(triangles: Triangle[]): Map<number, number[]> {
   // IMPORTANT: use EDGE-based connectivity, NOT vertex-based.
   //
@@ -234,14 +435,48 @@ export function resolveIntersections(
 ): { triangles: Triangle[]; resolved: number } {
   const shellMap = findShells(triangles);
 
-  console.log(`[resolveIntersections] found ${shellMap.size} shell(s) in ${triangles.length} triangles`);
-  for (const [id, idxs] of shellMap) {
-    console.log(`  shell ${id}: ${idxs.length} triangles`);
+  const shellList = [...shellMap.values()].sort((a, b) => b.length - a.length);
+  const totalTris = triangles.length;
+  const largestSize = shellList[0]?.length ?? 0;
+
+  console.log(`[resolveIntersections] found ${shellMap.size} shell(s) in ${totalTris} triangles`);
+  for (let s = 0; s < shellList.length; s++) {
+    console.log(`  shell ${s}: ${shellList[s].length} triangles`);
   }
 
-  if (shellMap.size < 2) return { triangles, resolved: 0 };
+  // Detect "dominant-shell" case: one shell holds ≥ 80% of all triangles.
+  // This means the parts (feather, vest, etc.) are MERGED into a single
+  // connected mesh — the between-shell algorithm won't help. Fall back to
+  // geometric self-intersection detection (Möller triangle-triangle test).
+  const dominantFraction = largestSize / totalTris;
+  const hasDominantShell = dominantFraction >= 0.8;
 
-  const shells = [...shellMap.values()].map((idxs) => {
+  const toRemove = new Set<number>();
+
+  if (hasDominantShell) {
+    console.log(
+      `[resolveIntersections] dominant single shell (${(dominantFraction * 100).toFixed(1)}% of triangles) ` +
+      `→ switching to Möller self-intersection detection`,
+    );
+    // Mark tiny separate shells (floating debris) for removal by object ref
+    const tinyShellObjs = new Set<Triangle>();
+    for (let s = 1; s < shellList.length; s++) {
+      if (shellList[s].length < 100) {
+        for (const idx of shellList[s]) tinyShellObjs.add(triangles[idx]);
+      }
+    }
+    // Run geometric self-intersection detection on the full mesh
+    const selfResult = removeSelfIntersections(triangles);
+    return {
+      triangles: selfResult.triangles.filter((t) => !tinyShellObjs.has(t)),
+      resolved: selfResult.resolved + tinyShellObjs.size,
+    };
+  }
+
+  if (shellList.length < 2) return { triangles, resolved: 0 };
+
+  // Multi-shell path: remove faces of shell A that are hidden inside shell B
+  const shells = shellList.map((idxs) => {
     const tris = idxs.map((i) => triangles[i]);
     const aabb = meshAABB(tris);
     const gX = new TriGrid(tris, aabb, 0);
@@ -249,8 +484,6 @@ export function resolveIntersections(
     const gZ = new TriGrid(tris, aabb, 2);
     return { idxs, tris, aabb, gX, gY, gZ };
   });
-
-  const toRemove = new Set<number>();
 
   for (let i = 0; i < shells.length; i++) {
     for (let j = i + 1; j < shells.length; j++) {
