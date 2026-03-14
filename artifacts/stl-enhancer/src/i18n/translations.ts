@@ -15,6 +15,9 @@ export const translations = {
       toggleWireframe: "Toggle Wireframe",
       uploadNew: "Upload New File",
       noModel: "No Model Loaded",
+      original: "Original",
+      enhanced: "Enhanced",
+      compareHint: "Drag to rotate · Scroll to zoom",
     },
     stats: {
       title: "Mesh Analytics",
@@ -97,6 +100,9 @@ export const translations = {
       toggleWireframe: "Alternar Wireframe",
       uploadNew: "Enviar Novo Arquivo",
       noModel: "Nenhum Modelo Carregado",
+      original: "Original",
+      enhanced: "Melhorado",
+      compareHint: "Arraste para girar · Role para zoom",
     },
     stats: {
       title: "Análise da Malha",

@@ -52,6 +52,7 @@ export default function Home() {
 
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [enhancedFileUrl, setEnhancedFileUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<StlStats | null>(null);
   const [isWireframe, setIsWireframe] = useState(false);
   
@@ -97,21 +98,27 @@ export default function Home() {
   const enhanceMutation = useEnhanceStl({
     mutation: {
       onSuccess: (blob) => {
-        const url = window.URL.createObjectURL(blob);
+        // Salva URL para visualização comparativa
+        const previewUrl = window.URL.createObjectURL(blob);
+        setEnhancedFileUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return previewUrl;
+        });
+
+        // Download automático
         const a = document.createElement("a");
-        a.href = url;
+        a.href = previewUrl;
         a.download = `enhanced_${file?.name || 'model.stl'}`;
         document.body.appendChild(a);
         a.click();
         a.remove();
-        
+
         toast({
           title: t.toast.enhanceDone,
           description: t.toast.enhanceDoneDesc,
         });
 
-        setFileUrl(url);
-        // Refresh credits after use
+        // Atualiza saldo de créditos
         refreshUser();
       },
       onError: (error: Error & { status?: number }) => {
@@ -143,6 +150,11 @@ export default function Home() {
       setFile(selectedFile);
       const url = URL.createObjectURL(selectedFile);
       setFileUrl(url);
+      // Limpa comparação ao enviar novo arquivo
+      setEnhancedFileUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       statsMutation.mutate({ data: { file: selectedFile } });
     }
   }, [statsMutation]);
@@ -159,8 +171,9 @@ export default function Home() {
   useEffect(() => {
     return () => {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
+      if (enhancedFileUrl) URL.revokeObjectURL(enhancedFileUrl);
     };
-  }, [fileUrl]);
+  }, [fileUrl, enhancedFileUrl]);
 
   const handleEnhance = () => {
     if (!file) return;
@@ -300,20 +313,20 @@ export default function Home() {
             </motion.div>
           )}
 
-          {file && (
-            <motion.div 
+          {file && !enhancedFileUrl && (
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="flex-1 relative glass-panel rounded-3xl overflow-hidden flex flex-col group"
             >
               <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button 
+                <button
                   onClick={() => setIsWireframe(!isWireframe)}
                   className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-secondary transition-colors text-foreground shadow-lg"
                   title={t.viewer.toggleWireframe}
                 >
                   {isWireframe ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
-                <button 
+                <button
                   {...getRootProps()}
                   className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-secondary transition-colors text-foreground shadow-lg"
                   title={t.viewer.uploadNew}
@@ -322,8 +335,56 @@ export default function Home() {
                   <Upload className="w-5 h-5" />
                 </button>
               </div>
-
               <StlViewer fileUrl={fileUrl} wireframe={isWireframe} />
+            </motion.div>
+          )}
+
+          {file && enhancedFileUrl && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="flex-1 flex flex-col gap-3"
+            >
+              {/* Barra de controles */}
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs text-muted-foreground">{t.viewer.compareHint}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsWireframe(!isWireframe)}
+                    className="p-2 rounded-xl bg-secondary/60 border border-white/8 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    title={t.viewer.toggleWireframe}
+                  >
+                    {isWireframe ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                  <button
+                    {...getRootProps()}
+                    className="p-2 rounded-xl bg-secondary/60 border border-white/8 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    title={t.viewer.uploadNew}
+                  >
+                    <input {...getInputProps()} />
+                    <Upload className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Dois visualizadores lado a lado */}
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-[400px]">
+                <div className="glass-panel rounded-2xl overflow-hidden">
+                  <StlViewer
+                    fileUrl={fileUrl}
+                    wireframe={isWireframe}
+                    label={t.viewer.original}
+                    labelColor="blue"
+                  />
+                </div>
+                <div className="glass-panel rounded-2xl overflow-hidden">
+                  <StlViewer
+                    fileUrl={enhancedFileUrl}
+                    wireframe={isWireframe}
+                    label={t.viewer.enhanced}
+                    labelColor="green"
+                  />
+                </div>
+              </div>
             </motion.div>
           )}
         </div>
