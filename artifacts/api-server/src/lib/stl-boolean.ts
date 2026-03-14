@@ -22,29 +22,23 @@ function aabbsOverlap(a: AABB, b: AABB): boolean {
          a.minZ <= b.maxZ && a.maxZ >= b.minZ;
 }
 
-// ─── Generic spatial grid indexed by two "non-ray" axes ──────────────────────
-// axis: 0=X,1=Y,2=Z  — the ray is shot in the POSITIVE direction of this axis.
-// The grid is indexed by the other two axes.
-
+// Spatial grid indexed by the two axes transverse to the ray direction
 class TriGrid {
   private buckets = new Map<string, Triangle[]>();
   private cellSize: number;
   readonly aabb: AABB;
   readonly axis: 0 | 1 | 2;
 
-  constructor(tris: Triangle[], aabb: AABB, axis: 0 | 1 | 2, cells = 20) {
+  constructor(tris: Triangle[], aabb: AABB, axis: 0 | 1 | 2, cells = 24) {
     this.aabb = aabb;
     this.axis = axis;
-
-    // The two "transverse" axes
     const [a1, a2] = axis === 0 ? [1, 2] : axis === 1 ? [0, 2] : [0, 1];
     const spans = [
-      Math.max((aabb.maxX - aabb.minX), 1e-6),
-      Math.max((aabb.maxY - aabb.minY), 1e-6),
-      Math.max((aabb.maxZ - aabb.minZ), 1e-6),
+      Math.max(aabb.maxX - aabb.minX, 1e-6),
+      Math.max(aabb.maxY - aabb.minY, 1e-6),
+      Math.max(aabb.maxZ - aabb.minZ, 1e-6),
     ];
     this.cellSize = Math.max(spans[a1], spans[a2]) / cells;
-
     const mins = [aabb.minX, aabb.minY, aabb.minZ];
 
     for (const tri of tris) {
@@ -72,80 +66,61 @@ class TriGrid {
   }
 }
 
-// ─── Möller–Trumbore for a ray along one of the cardinal axes ────────────────
-// axis 0 = +X, axis 1 = +Y, axis 2 = +Z
-
+// Möller–Trumbore for cardinal-axis ray from point (px,py,pz) in +axis direction
 function rayTriHit(
-  px: number, py: number, pz: number,
-  axis: 0 | 1 | 2,
+  px: number, py: number, pz: number, axis: 0 | 1 | 2,
   ax: number, ay: number, az: number,
   bx: number, by: number, bz: number,
   cx: number, cy: number, cz: number,
 ): boolean {
   const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
   const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
-
-  let hy: number, hz: number;
-  let det: number, inv: number;
-  let sx: number, sy: number, sz: number;
-  let u: number;
-  let qx: number, qy: number, qz: number;
-  let v: number, t: number;
+  let det: number, inv: number, u: number, v: number, t: number;
+  const sx = px - ax, sy = py - ay, sz = pz - az;
+  const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
 
   if (axis === 0) {
-    // D = (1,0,0) → h = D×e2 = (0, -e2z, e2y)
-    hy = -e2z; hz = e2y;
-    det = e1y * hy + e1z * hz;
+    // D=(1,0,0) h=D×e2=(0,-e2z,e2y)
+    det = e1y * (-e2z) + e1z * e2y;
     if (Math.abs(det) < 1e-10) return false;
     inv = 1 / det;
-    sx = px - ax; sy = py - ay; sz = pz - az;
-    u = (sy * hy + sz * hz) * inv;
+    u = (sy * (-e2z) + sz * e2y) * inv;
     if (u < 0 || u > 1) return false;
-    qx = sy * e1z - sz * e1y; qy = sz * e1x - sx * e1z; qz = sx * e1y - sy * e1x;
     v = qx * inv;
     if (v < 0 || u + v > 1) return false;
     t = (e2x * qx + e2y * qy + e2z * qz) * inv;
   } else if (axis === 1) {
-    // D = (0,1,0) → h = D×e2 = (e2z, 0, -e2x)
-    const hx2 = e2z; const hz2 = -e2x;
-    det = e1x * hx2 + e1z * hz2;
+    // D=(0,1,0) h=D×e2=(e2z,0,-e2x)
+    det = e1x * e2z + e1z * (-e2x);
     if (Math.abs(det) < 1e-10) return false;
     inv = 1 / det;
-    sx = px - ax; sy = py - ay; sz = pz - az;
-    u = (sx * hx2 + sz * hz2) * inv;
+    u = (sx * e2z + sz * (-e2x)) * inv;
     if (u < 0 || u > 1) return false;
-    qx = sy * e1z - sz * e1y; qy = sz * e1x - sx * e1z; qz = sx * e1y - sy * e1x;
     v = qy * inv;
     if (v < 0 || u + v > 1) return false;
     t = (e2x * qx + e2y * qy + e2z * qz) * inv;
   } else {
-    // D = (0,0,1) → h = D×e2 = (-e2y, e2x, 0)
-    const hx3 = -e2y; const hy3 = e2x;
-    det = e1x * hx3 + e1y * hy3;
+    // D=(0,0,1) h=D×e2=(-e2y,e2x,0)
+    det = e1x * (-e2y) + e1y * e2x;
     if (Math.abs(det) < 1e-10) return false;
     inv = 1 / det;
-    sx = px - ax; sy = py - ay; sz = pz - az;
-    u = (sx * hx3 + sy * hy3) * inv;
+    u = (sx * (-e2y) + sy * e2x) * inv;
     if (u < 0 || u > 1) return false;
-    qx = sy * e1z - sz * e1y; qy = sz * e1x - sx * e1z; qz = sx * e1y - sy * e1x;
     v = qz * inv;
     if (v < 0 || u + v > 1) return false;
     t = (e2x * qx + e2y * qy + e2z * qz) * inv;
   }
-
   return t > 1e-6;
 }
 
-// Cast a ray along `axis` and return hit count (parity → odd=inside)
 function countHits(px: number, py: number, pz: number, axis: 0 | 1 | 2, grid: TriGrid): number {
   const aabb = grid.aabb;
   const [a1, a2] = axis === 0 ? [1, 2] : axis === 1 ? [0, 2] : [0, 1];
   const p = [px, py, pz];
-  const u = p[a1], w = p[a2];
   const mins = [aabb.minX, aabb.minY, aabb.minZ];
   const maxs = [aabb.maxX, aabb.maxY, aabb.maxZ];
-  if (u < mins[a1] || u > maxs[a1] || w < mins[a2] || w > maxs[a2]) return 0;
-  const tris = grid.query(u, w);
+  if (p[a1] < mins[a1] || p[a1] > maxs[a1] || p[a2] < mins[a2] || p[a2] > maxs[a2]) return 0;
+  const tris = grid.query(p[a1], p[a2]);
   let hits = 0;
   for (const tri of tris) {
     if (rayTriHit(px, py, pz, axis, tri.v1[0], tri.v1[1], tri.v1[2], tri.v2[0], tri.v2[1], tri.v2[2], tri.v3[0], tri.v3[1], tri.v3[2])) hits++;
@@ -153,16 +128,27 @@ function countHits(px: number, py: number, pz: number, axis: 0 | 1 | 2, grid: Tr
   return hits;
 }
 
-// Majority-vote inside test: cast 3 rays in +X, +Y, +Z — point is inside if ≥2 agree
+// Majority-vote (3 axes) inside test
 function isInsideMesh(
   px: number, py: number, pz: number,
-  gridX: TriGrid, gridY: TriGrid, gridZ: TriGrid,
+  gX: TriGrid, gY: TriGrid, gZ: TriGrid,
 ): boolean {
   let votes = 0;
-  if (countHits(px, py, pz, 0, gridX) % 2 === 1) votes++;
-  if (countHits(px, py, pz, 1, gridY) % 2 === 1) votes++;
-  if (countHits(px, py, pz, 2, gridZ) % 2 === 1) votes++;
+  if (countHits(px, py, pz, 0, gX) % 2 === 1) votes++;
+  if (countHits(px, py, pz, 1, gY) % 2 === 1) votes++;
+  if (countHits(px, py, pz, 2, gZ) % 2 === 1) votes++;
   return votes >= 2;
+}
+
+// Compute face normal (not normalized — we only need direction)
+function faceNormal(t: Triangle): [number, number, number] {
+  const e1x = t.v2[0] - t.v1[0], e1y = t.v2[1] - t.v1[1], e1z = t.v2[2] - t.v1[2];
+  const e2x = t.v3[0] - t.v1[0], e2y = t.v3[1] - t.v1[1], e2z = t.v3[2] - t.v1[2];
+  const nx = e1y * e2z - e1z * e2y;
+  const ny = e1z * e2x - e1x * e2z;
+  const nz = e1x * e2y - e1y * e2x;
+  const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+  return [nx / len, ny / len, nz / len];
 }
 
 function findShells(triangles: Triangle[]): Map<number, number[]> {
@@ -204,11 +190,17 @@ export function resolveIntersections(
   const shells = [...shellMap.values()].map((idxs) => {
     const tris = idxs.map((i) => triangles[i]);
     const aabb = meshAABB(tris);
-    // Build 3 grids (one per ray direction) for robust inside-test
-    const gridX = new TriGrid(tris, aabb, 0);
-    const gridY = new TriGrid(tris, aabb, 1);
-    const gridZ = new TriGrid(tris, aabb, 2);
-    return { idxs, tris, aabb, gridX, gridY, gridZ };
+    // Compute a safe epsilon: 0.3% of the model diagonal
+    const diag = Math.sqrt(
+      (aabb.maxX - aabb.minX) ** 2 +
+      (aabb.maxY - aabb.minY) ** 2 +
+      (aabb.maxZ - aabb.minZ) ** 2,
+    );
+    const eps = Math.max(diag * 0.003, 0.05);
+    const gX = new TriGrid(tris, aabb, 0);
+    const gY = new TriGrid(tris, aabb, 1);
+    const gZ = new TriGrid(tris, aabb, 2);
+    return { idxs, tris, aabb, gX, gY, gZ, eps };
   });
 
   const toRemove = new Set<number>();
@@ -218,24 +210,32 @@ export function resolveIntersections(
       const A = shells[i], B = shells[j];
       if (!aabbsOverlap(A.aabb, B.aabb)) continue;
 
-      // Remove triangles of A that are hidden inside B
+      // A triangle from shell A is "hidden by" shell B if:
+      // a point slightly AHEAD of the face (centroid + ε·normal) is INSIDE B.
+      // This correctly identifies faces whose visible side faces INTO another shell,
+      // while preserving outward-facing surfaces (e.g. vest exterior facing away from body).
+
       for (let k = 0; k < A.tris.length; k++) {
         const t = A.tris[k];
         const cx = (t.v1[0] + t.v2[0] + t.v3[0]) / 3;
         const cy = (t.v1[1] + t.v2[1] + t.v3[1]) / 3;
         const cz = (t.v1[2] + t.v2[2] + t.v3[2]) / 3;
-        if (isInsideMesh(cx, cy, cz, B.gridX, B.gridY, B.gridZ)) {
+        const [nx, ny, nz] = faceNormal(t);
+        // Test the point just in front of this face
+        const px = cx + A.eps * nx, py = cy + A.eps * ny, pz = cz + A.eps * nz;
+        if (isInsideMesh(px, py, pz, B.gX, B.gY, B.gZ)) {
           toRemove.add(A.idxs[k]);
         }
       }
 
-      // Remove triangles of B that are hidden inside A
       for (let k = 0; k < B.tris.length; k++) {
         const t = B.tris[k];
         const cx = (t.v1[0] + t.v2[0] + t.v3[0]) / 3;
         const cy = (t.v1[1] + t.v2[1] + t.v3[1]) / 3;
         const cz = (t.v1[2] + t.v2[2] + t.v3[2]) / 3;
-        if (isInsideMesh(cx, cy, cz, A.gridX, A.gridY, A.gridZ)) {
+        const [nx, ny, nz] = faceNormal(t);
+        const px = cx + B.eps * nx, py = cy + B.eps * ny, pz = cz + B.eps * nz;
+        if (isInsideMesh(px, py, pz, A.gX, A.gY, A.gZ)) {
           toRemove.add(B.idxs[k]);
         }
       }
