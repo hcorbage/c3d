@@ -210,9 +210,11 @@ export default function Home() {
       <header className="w-full border-b border-white/5 bg-background/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-blue-400 flex items-center justify-center shadow-lg shadow-primary/20">
-              <Box className="w-6 h-6 text-white" />
-            </div>
+            <img
+              src="/corb3d-robot.svg"
+              alt="Corb3D Robot"
+              className="w-11 h-11 drop-shadow-[0_0_8px_rgba(0,229,204,0.5)]"
+            />
             <h1 className="font-display text-2xl tracking-tight font-bold glow-text">
               {t.appName}<span className="text-primary">.</span>
             </h1>
