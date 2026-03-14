@@ -339,7 +339,7 @@ export default function Home() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col lg:flex-row gap-8">
         
         {/* Left Column: Viewer & Upload */}
-        <div className="flex-1 flex flex-col gap-6 min-h-[600px] lg:min-h-0">
+        <div className="flex-1 flex flex-col gap-4 lg:self-start">
           
           {!file && (
             <motion.div 
@@ -347,7 +347,7 @@ export default function Home() {
               animate={{ opacity: 1, scale: 1 }}
               {...getRootProps()} 
               className={`
-                flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-3xl cursor-pointer transition-all duration-300
+                h-[460px] flex flex-col items-center justify-center border-2 border-dashed rounded-3xl cursor-pointer transition-all duration-300
                 ${isDragActive ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-border bg-card hover:border-primary/50 hover:bg-muted/50'}
               `}
             >
@@ -369,62 +369,67 @@ export default function Home() {
           {file && !enhancedFileUrl && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="flex-1 relative glass-panel rounded-3xl overflow-hidden flex flex-col group"
+              className="flex flex-col gap-2"
             >
-              <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button
-                  onClick={() => setIsWireframe(!isWireframe)}
-                  className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-secondary transition-colors text-foreground shadow-lg"
-                  title={t.viewer.toggleWireframe}
-                  disabled={enhanceMutation.isPending}
-                >
-                  {isWireframe ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-                <button
-                  {...getRootProps()}
-                  className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-secondary transition-colors text-foreground shadow-lg"
-                  title={t.viewer.uploadNew}
-                  disabled={enhanceMutation.isPending}
-                >
-                  <input {...getInputProps()} />
-                  <Upload className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={clearFile}
-                  className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-400 transition-colors text-muted-foreground shadow-lg"
-                  title={t.viewer.clearFile}
-                  disabled={enhanceMutation.isPending}
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+              {/* Viewer — fixed height */}
+              <div className="h-[460px] relative glass-panel rounded-2xl overflow-hidden">
+                {/* Processing overlay */}
+                <AnimatePresence>
+                  {enhanceMutation.isPending && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm gap-4"
+                    >
+                      <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-foreground">{t.actions.processing}</p>
+                        <p className="text-2xl font-mono font-bold text-primary mt-1">{Math.round(progress)}%</p>
+                      </div>
+                      <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-[width] duration-150 ease-linear"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <StlViewer fileUrl={fileUrl} wireframe={isWireframe} />
               </div>
 
-              {/* Processing overlay */}
-              <AnimatePresence>
-                {enhanceMutation.isPending && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm rounded-3xl gap-4"
+              {/* Controls bar — always visible below the viewer */}
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs text-muted-foreground">{t.viewer.compareHint}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsWireframe(!isWireframe)}
+                    className="p-2 rounded-xl bg-secondary/60 border border-white/8 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    title={t.viewer.toggleWireframe}
+                    disabled={enhanceMutation.isPending}
                   >
-                    <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-foreground">{t.actions.processing}</p>
-                      <p className="text-2xl font-mono font-bold text-primary mt-1">{Math.round(progress)}%</p>
-                    </div>
-                    {/* Mini progress bar */}
-                    <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-[width] duration-150 ease-linear"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <StlViewer fileUrl={fileUrl} wireframe={isWireframe} />
+                    {isWireframe ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                  <button
+                    {...getRootProps()}
+                    className="p-2 rounded-xl bg-secondary/60 border border-white/8 hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    title={t.viewer.uploadNew}
+                    disabled={enhanceMutation.isPending}
+                  >
+                    <input {...getInputProps()} />
+                    <Upload className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={clearFile}
+                    className="p-2 rounded-xl bg-secondary/60 border border-white/8 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-400 transition-colors text-muted-foreground"
+                    title={t.viewer.clearFile}
+                    disabled={enhanceMutation.isPending}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </motion.div>
           )}
 
@@ -465,8 +470,8 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Side-by-side before / after */}
-              <div className="flex-1 flex gap-3 min-h-[400px]">
+              {/* Side-by-side before / after — fixed height */}
+              <div className="flex gap-3 h-[420px]">
                 {/* BEFORE */}
                 <div className="flex-1 flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 px-1">
