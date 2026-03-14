@@ -182,14 +182,49 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     const exposedHeaders = "X-Quality-Report, X-Parts-Count";
 
     // ── Split Shells: return a ZIP with one STL per detected shell ────────────
+    // IMPORTANT: We detect shells from the RAW input (before removeDuplicates /
+    // resolveIntersections) because those operations weld shared boundary vertices
+    // across shells, collapsing multiple shells into one from a topology standpoint.
+    // Each shell is then repaired individually so the ZIP contains clean, separate files.
     if (shouldSplitShells) {
-      const { shells } = detectShells(triangles);
+      const rawTriangles = parseStl(req.file.buffer).triangles;
+      const { shells: rawShells, shellCount: detectedCount } = detectShells(rawTriangles);
 
       // Sort shells largest-first so part_1 is the main body
-      shells.sort((a, b) => b.length - a.length);
+      rawShells.sort((a, b) => b.length - a.length);
 
-      const partsCount = shells.length;
-      console.log(`[splitShells] detected ${partsCount} shell(s)`);
+      const partsCount = rawShells.length;
+      console.log(`[splitShells] detected ${detectedCount} shell(s) from raw mesh`);
+
+      // Apply basic repair to each shell independently
+      const repairedShells = rawShells.map((shellTris, idx) => {
+        let repaired = shellTris;
+
+        const dupResult = removeDuplicatesAndDegenerate(repaired);
+        repaired = dupResult.triangles;
+
+        // Fill holes per shell (safe because we're not reconnecting shells)
+        if (shouldFillHoles) {
+          const holeResult = fillHoles(repaired, maxHoleSize);
+          repaired = holeResult.triangles;
+        }
+
+        if (shouldFixNormals) {
+          repaired = fixNormals(repaired);
+        }
+
+        if (shouldDecimate) {
+          const decimResult = decimateMesh(repaired, 1 - decimateRatio);
+          repaired = decimResult.triangles;
+        }
+
+        if (smoothingIterations > 0) {
+          repaired = laplacianSmooth(repaired, smoothingIterations);
+        }
+
+        console.log(`[splitShells] shell ${idx + 1}: ${shellTris.length} → ${repaired.length} triangles`);
+        return repaired;
+      });
 
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="parts.zip"`);
@@ -201,8 +236,8 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       archive.on("error", (err: Error) => { throw err; });
       archive.pipe(res);
 
-      for (let i = 0; i < shells.length; i++) {
-        const shellBuf = writeBinaryStl(shells[i]);
+      for (let i = 0; i < repairedShells.length; i++) {
+        const shellBuf = writeBinaryStl(repairedShells[i]);
         archive.append(shellBuf, { name: `part_${i + 1}.stl` });
       }
 

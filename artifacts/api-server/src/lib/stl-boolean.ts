@@ -133,14 +133,17 @@ function isInsideMesh(
   return votes >= 2;
 }
 
-// ─── A triangle is considered "hidden" by another shell if ALL THREE of its
-// sample points (centroid + two vertices) are inside the other shell.
-// Requiring all 3 avoids removing boundary triangles that are only barely inside.
+// ─── A triangle is considered "hidden" by another shell if:
+//   centroid is inside   AND   at least 1 of the 2 edge midpoints is inside (2/3 majority).
+//
+// Using a 2-out-of-3 rule (centroid + 1 midpoint) removes boundary triangles that
+// straddle the shell surface — the main cause of paint bleeding in BambuLab.
+// The previous "all-3" rule was too conservative and left those straddling triangles.
 function isTriangleHiddenBy(
   t: Triangle,
   gX: TriGrid, gY: TriGrid, gZ: TriGrid,
 ): boolean {
-  // centroid
+  // centroid must be inside (required anchor — prevents false positives)
   const cx = (t.v1[0] + t.v2[0] + t.v3[0]) / 3;
   const cy = (t.v1[1] + t.v2[1] + t.v3[1]) / 3;
   const cz = (t.v1[2] + t.v2[2] + t.v3[2]) / 3;
@@ -150,15 +153,19 @@ function isTriangleHiddenBy(
   const m1x = (t.v1[0] + t.v2[0]) / 2;
   const m1y = (t.v1[1] + t.v2[1]) / 2;
   const m1z = (t.v1[2] + t.v2[2]) / 2;
-  if (!isInsideMesh(m1x, m1y, m1z, gX, gY, gZ)) return false;
+  if (isInsideMesh(m1x, m1y, m1z, gX, gY, gZ)) return true; // centroid + midpoint 1 ✓
 
   // midpoint of edge v2-v3
   const m2x = (t.v2[0] + t.v3[0]) / 2;
   const m2y = (t.v2[1] + t.v3[1]) / 2;
   const m2z = (t.v2[2] + t.v3[2]) / 2;
-  if (!isInsideMesh(m2x, m2y, m2z, gX, gY, gZ)) return false;
+  if (isInsideMesh(m2x, m2y, m2z, gX, gY, gZ)) return true; // centroid + midpoint 2 ✓
 
-  return true;
+  // midpoint of edge v3-v1 (extra coverage for sliver triangles)
+  const m3x = (t.v3[0] + t.v1[0]) / 2;
+  const m3y = (t.v3[1] + t.v1[1]) / 2;
+  const m3z = (t.v3[2] + t.v1[2]) / 2;
+  return isInsideMesh(m3x, m3y, m3z, gX, gY, gZ); // centroid + midpoint 3 ✓
 }
 
 function findShells(triangles: Triangle[]): Map<number, number[]> {
