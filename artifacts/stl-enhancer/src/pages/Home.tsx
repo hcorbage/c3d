@@ -3,7 +3,8 @@ import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Upload, Box, Zap, Settings2, Download, 
-  Activity, Info, Layers, Maximize, AlertCircle, Eye, EyeOff, ShieldCheck
+  Activity, Info, Layers, Maximize, AlertCircle, Eye, EyeOff, ShieldCheck,
+  LogIn, LogOut, User, CreditCard
 } from "lucide-react";
 import { useEnhanceStl, useGetStlStats } from "@workspace/api-client-react";
 import { StlViewer } from "@/components/StlViewer";
@@ -13,6 +14,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import type { StlStats } from "@workspace/api-client-react";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthModal } from "@/components/AuthModal";
+import { CreditsModal } from "@/components/CreditsModal";
 
 function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();
@@ -44,6 +48,7 @@ function LanguageSwitcher() {
 
 export default function Home() {
   const { t } = useLanguage();
+  const { user, logout, refreshUser } = useAuth();
 
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -55,8 +60,25 @@ export default function Home() {
   const [fixNormals, setFixNormals] = useState(true);
   const [fillHoles, setFillHoles] = useState(true);
 
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
+
   const { toast } = useToast();
   
+  // Handle payment redirect params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success") {
+      toast({ title: t.toast.paymentSuccess });
+      refreshUser();
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("payment") === "cancelled") {
+      toast({ title: t.toast.paymentCancelled, variant: "destructive" });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const statsMutation = useGetStlStats({
     mutation: {
       onSuccess: (data) => {
@@ -89,8 +111,23 @@ export default function Home() {
         });
 
         setFileUrl(url);
+        // Refresh credits after use
+        refreshUser();
       },
-      onError: (error) => {
+      onError: (error: Error & { status?: number }) => {
+        if (error.status === 401 || (error as any)?.data?.code === "NO_CREDITS") {
+          setShowAuthModal(true);
+          return;
+        }
+        if (error.status === 402 || (error as any)?.data?.code === "NO_CREDITS") {
+          toast({
+            title: t.credits.insufficient,
+            description: t.credits.insufficientDesc,
+            variant: "destructive",
+          });
+          setShowCreditsModal(true);
+          return;
+        }
         toast({
           title: t.toast.enhanceFail,
           description: error.message || t.toast.enhanceFailDesc,
@@ -127,6 +164,20 @@ export default function Home() {
 
   const handleEnhance = () => {
     if (!file) return;
+    if (!user) {
+      setAuthMode("login");
+      setShowAuthModal(true);
+      return;
+    }
+    if (!user.isAdmin && user.credits < 1) {
+      toast({
+        title: t.credits.insufficient,
+        description: t.credits.insufficientDesc,
+        variant: "destructive",
+      });
+      setShowCreditsModal(true);
+      return;
+    }
     enhanceMutation.mutate({
       data: {
         file,
@@ -156,15 +207,64 @@ export default function Home() {
           
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
+            
             {file && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 text-sm font-medium bg-secondary/50 px-4 py-2 rounded-full border border-white/5"
+                className="hidden sm:flex items-center gap-3 text-sm font-medium bg-secondary/50 px-4 py-2 rounded-full border border-white/5"
               >
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                 {file.name}
               </motion.div>
+            )}
+
+            {user ? (
+              <div className="flex items-center gap-2">
+                {/* Credit balance */}
+                <button
+                  onClick={() => !user.isAdmin && setShowCreditsModal(true)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+                    user.isAdmin
+                      ? "bg-yellow-400/10 border-yellow-400/20 text-yellow-400 cursor-default"
+                      : user.credits < 1
+                      ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 cursor-pointer"
+                      : "bg-secondary/60 border-white/8 text-foreground hover:bg-secondary cursor-pointer"
+                  }`}
+                >
+                  <Zap size={13} className={user.isAdmin ? "text-yellow-400" : user.credits < 2 ? "text-red-400" : "text-primary"} />
+                  {user.isAdmin ? t.credits.adminUnlimited : `${user.credits} ${t.credits.balance}`}
+                </button>
+                {/* Username */}
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <User size={14} />
+                  <span className="hidden sm:inline">{user.username}</span>
+                </div>
+                {/* Logout */}
+                <button
+                  onClick={logout}
+                  title={t.auth.logout}
+                  className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setAuthMode("login"); setShowAuthModal(true); }}
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-secondary/60 border border-white/8 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
+                >
+                  <LogIn size={14} />
+                  {t.auth.login}
+                </button>
+                <button
+                  onClick={() => { setAuthMode("register"); setShowAuthModal(true); }}
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition-colors"
+                >
+                  {t.auth.register}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -381,34 +481,64 @@ export default function Home() {
             </div>
 
             {/* Action Button */}
-            <button
-              onClick={handleEnhance}
-              disabled={!file || enhanceMutation.isPending || statsMutation.isPending}
-              className={`
-                mt-8 w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2
-                transition-all duration-300 relative overflow-hidden
-                ${(!file || enhanceMutation.isPending) 
-                  ? 'bg-secondary text-muted-foreground cursor-not-allowed' 
-                  : 'bg-primary text-primary-foreground hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)] hover:-translate-y-1 active:translate-y-0'}
-              `}
-            >
-              {enhanceMutation.isPending ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  {t.actions.processing}
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  {t.actions.enhance}
-                </>
-              )}
-            </button>
+            {!user ? (
+              <button
+                onClick={() => { setAuthMode("login"); setShowAuthModal(true); }}
+                disabled={!file}
+                className="mt-8 w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2 bg-secondary border border-white/10 text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <LogIn className="w-5 h-5" />
+                {t.auth.signInToEnhance}
+              </button>
+            ) : !user.isAdmin && user.credits < 1 ? (
+              <button
+                onClick={() => setShowCreditsModal(true)}
+                className="mt-8 w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-all duration-300"
+              >
+                <CreditCard className="w-5 h-5" />
+                {t.credits.buy}
+              </button>
+            ) : (
+              <button
+                onClick={handleEnhance}
+                disabled={!file || enhanceMutation.isPending || statsMutation.isPending}
+                className={`
+                  mt-8 w-full py-4 rounded-2xl font-display font-bold text-lg flex items-center justify-center gap-2
+                  transition-all duration-300 relative overflow-hidden
+                  ${(!file || enhanceMutation.isPending) 
+                    ? 'bg-secondary text-muted-foreground cursor-not-allowed' 
+                    : 'bg-primary text-primary-foreground hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)] hover:-translate-y-1 active:translate-y-0'}
+                `}
+              >
+                {enhanceMutation.isPending ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    {t.actions.processing}
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    {t.actions.enhance}
+                  </>
+                )}
+              </button>
+            )}
 
           </div>
         </div>
 
       </main>
+
+      {/* Modals */}
+      {showAuthModal && (
+        <AuthModal
+          initialMode={authMode}
+          onClose={() => setShowAuthModal(false)}
+        />
+      )}
+      {showCreditsModal && (
+        <CreditsModal onClose={() => setShowCreditsModal(false)} />
+      )}
     </div>
   );
 }

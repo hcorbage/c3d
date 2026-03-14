@@ -285,6 +285,12 @@ export async function customFetch<T = unknown>(
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
 
+  // Inject JWT auth token if stored
+  if (typeof localStorage !== "undefined" && !headers.has("authorization")) {
+    const token = localStorage.getItem("c3d_auth_token");
+    if (token) headers.set("authorization", `Bearer ${token}`);
+  }
+
   if (
     typeof init.body === "string" &&
     !headers.has("content-type") &&

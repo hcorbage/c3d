@@ -1,8 +1,8 @@
-# Workspace
+# C3D STL Enhancer
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Professional 3D mesh repair and optimization tool. pnpm workspace monorepo using TypeScript.
 
 ## Stack
 
@@ -12,9 +12,12 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM
+- **Auth**: bcryptjs + JWT (localStorage token, injected into all API calls via custom-fetch.ts)
+- **Payments**: Stripe Checkout (standard SDK, no Replit-specific integration)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Frontend**: React + Vite, Tailwind CSS, framer-motion, Three.js (@react-three/fiber)
 
 ## Structure
 

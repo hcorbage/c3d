@@ -4,6 +4,9 @@ import { parseStl, writeBinaryStl } from "../lib/stl-parser.js";
 import { computeStats } from "../lib/stl-stats.js";
 import { removeDuplicatesAndDegenerate, fixNormals, laplacianSmooth } from "../lib/stl-enhance.js";
 import { fillHoles } from "../lib/stl-fill-holes.js";
+import { requireAuth } from "../middlewares/auth.js";
+import { db, usersTable, creditTransactionsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 const upload = multer({
@@ -27,11 +30,21 @@ router.post("/stl/stats", upload.single("file"), (req: Request, res: Response) =
   }
 });
 
-router.post("/stl/enhance", upload.single("file"), (req: Request, res: Response) => {
+router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: "No file uploaded" });
       return;
+    }
+
+    // Check credits (admin = unlimited, everyone else needs >= 1)
+    const isAdmin = req.user!.isAdmin;
+    if (!isAdmin) {
+      const [userRow] = await db.select({ credits: usersTable.credits }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+      if (!userRow || userRow.credits < 1) {
+        res.status(402).json({ error: "Insufficient credits", code: "NO_CREDITS" });
+        return;
+      }
     }
 
     const mesh = parseStl(req.file.buffer);
@@ -66,6 +79,17 @@ router.post("/stl/enhance", upload.single("file"), (req: Request, res: Response)
     }
 
     const outputBuffer = writeBinaryStl(triangles);
+
+    // Deduct 1 credit (non-admin only)
+    if (!isAdmin) {
+      await db.update(usersTable).set({ credits: sql`${usersTable.credits} - 1` }).where(eq(usersTable.id, req.user!.id));
+      await db.insert(creditTransactionsTable).values({
+        userId: req.user!.id,
+        amount: -1,
+        type: "use",
+        description: "STL enhancement",
+      });
+    }
 
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader("Content-Disposition", 'attachment; filename="enhanced.stl"');
