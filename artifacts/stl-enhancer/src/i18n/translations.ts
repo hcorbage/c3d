@@ -2,7 +2,7 @@ export type Language = "en" | "pt-BR";
 
 export const translations = {
   en: {
-    appName: "STL Enhancer",
+    appName: "C3D STL Enhancer",
     header: {
       file: "file loaded",
     },
@@ -55,7 +55,7 @@ export const translations = {
     },
   },
   "pt-BR": {
-    appName: "STL Enhancer",
+    appName: "C3D STL Enhancer",
     header: {
       file: "arquivo carregado",
     },
