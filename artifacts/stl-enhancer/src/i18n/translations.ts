@@ -66,6 +66,9 @@ export const translations = {
       splitShellsDesc: "Detects each separate body in the model and downloads a ZIP with one STL per part. Import each file as a separate body in BambuLab / Orca Slicer and assign a different filament to each — no manual painting needed.",
       splitShellsHint: "Model has multiple shells — ideal for splitting into separate color parts.",
       splitShellsConflict: "Cannot use with Merge Shells.",
+      smoothSeams: "Smooth Boundary Lines",
+      smoothSeamsDesc: "Smooths the jagged seam edges between separate shells — the zigzagged boundary lines left where parts meet. Uses Taubin smoothing on open edge loops only, so the interior geometry stays unchanged. Ideal after Resolve Intersections.",
+      smoothSeamsHint: "Open boundary edges detected — smoothing will clean up the seam lines.",
     },
     report: {
       title: "Quality Report",
@@ -207,6 +210,9 @@ export const translations = {
       splitShellsDesc: "Detecta cada corpo separado no modelo e baixa um ZIP com um STL por parte. Importe cada arquivo como um corpo separado no BambuLab / Orca Slicer e atribua um filamento diferente a cada um — sem precisar pintar manualmente.",
       splitShellsHint: "Modelo com múltiplas cascas — ideal para separar em partes com cores diferentes.",
       splitShellsConflict: "Não pode usar junto com Mesclar Cascas.",
+      smoothSeams: "Suavizar Linhas de Borda",
+      smoothSeamsDesc: "Suaviza as arestas dentadas entre cascas separadas — as linhas em ziguezague que aparecem onde as peças se encontram. Aplica suavização Taubin apenas nas arestas abertas, sem alterar a geometria interna. Ideal após Resolver Interseções.",
+      smoothSeamsHint: "Arestas abertas detectadas — a suavização vai limpar as linhas de costura.",
     },
     report: {
       title: "Relatório de Qualidade",

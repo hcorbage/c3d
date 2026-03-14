@@ -85,6 +85,7 @@ export type EnhanceStlBody = {
   decimateRatio?: number;
   resolveIntersections?: boolean;
   splitShells?: boolean;
+  smoothSeams?: boolean;
 };
 
 export type GetStlStatsBody = {

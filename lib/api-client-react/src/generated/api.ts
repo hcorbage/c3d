@@ -156,6 +156,9 @@ export const enhanceStl = async (
   if (enhanceStlBody.splitShells !== undefined) {
     formData.append(`splitShells`, enhanceStlBody.splitShells.toString());
   }
+  if (enhanceStlBody.smoothSeams !== undefined) {
+    formData.append(`smoothSeams`, enhanceStlBody.smoothSeams.toString());
+  }
 
   // Inject JWT
   const headers = new Headers();

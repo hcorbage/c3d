@@ -3,7 +3,7 @@ import multer from "multer";
 import archiver from "archiver";
 import { parseStl, writeBinaryStl } from "../lib/stl-parser.js";
 import { computeStats } from "../lib/stl-stats.js";
-import { removeDuplicatesAndDegenerate, fixNormals, laplacianSmooth } from "../lib/stl-enhance.js";
+import { removeDuplicatesAndDegenerate, fixNormals, laplacianSmooth, smoothBoundaryLoops } from "../lib/stl-enhance.js";
 import { fillHoles } from "../lib/stl-fill-holes.js";
 import { detectShells, mergeShells } from "../lib/stl-shells.js";
 import { decimateMesh } from "../lib/stl-decimate.js";
@@ -45,6 +45,7 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
     const shouldDecimate = req.body.decimate === "true";
     const shouldResolveIntersections = req.body.resolveIntersections === "true";
     const shouldSplitShells = req.body.splitShells === "true";
+    const shouldSmoothSeams = req.body.smoothSeams === "true";
     const decimateRatio = Math.min(0.95, Math.max(0.05, parseFloat(req.body.decimateRatio ?? "0.5") || 0.5));
     const maxHoleSize = Math.min(5000, Math.max(3, parseInt(req.body.maxHoleSize ?? "500", 10) || 500));
     const smoothingIterations = Math.min(20, Math.max(0, parseInt(req.body.smoothingIterations ?? "3", 10) || 0));
@@ -74,6 +75,7 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       trianglesReduced: 0,
       shellsMerged: 0,
       intersectionsResolved: 0,
+      seamsSmoothed: 0,
     };
 
     // Compute BEFORE stats
@@ -90,6 +92,11 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       fixes.intersectionsResolved = result.resolved;
       triangles = result.triangles;
       console.log(`[resolveIntersections] removed ${result.resolved} hidden triangles`);
+
+      // Smooth the open boundary loops left by resolveIntersections — makes the
+      // seam lines between shells smooth instead of jagged/zigzagged
+      triangles = smoothBoundaryLoops(triangles, 10);
+      console.log(`[smoothBoundaryLoops] smoothed boundary seams (10 Taubin iterations)`);
     }
 
     if (shouldRemoveDuplicates) {
@@ -121,6 +128,14 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
       const result = decimateMesh(triangles, 1 - decimateRatio);
       fixes.trianglesReduced = result.trianglesRemoved;
       triangles = result.triangles;
+    }
+
+    // Standalone boundary seam smoothing (also auto-runs inside resolveIntersections block above)
+    if (shouldSmoothSeams && !shouldResolveIntersections) {
+      const before = triangles.length;
+      triangles = smoothBoundaryLoops(triangles, 10);
+      fixes.seamsSmoothed = before; // just a signal that it ran
+      console.log(`[smoothSeams] smoothed all boundary loops`);
     }
 
     if (smoothingIterations > 0) {
@@ -217,6 +232,9 @@ router.post("/stl/enhance", requireAuth, upload.single("file"), async (req: Requ
           const decimResult = decimateMesh(repaired, 1 - decimateRatio);
           repaired = decimResult.triangles;
         }
+
+        // Smooth the open boundary edges of each shell (the cut seams)
+        repaired = smoothBoundaryLoops(repaired, 10);
 
         if (smoothingIterations > 0) {
           repaired = laplacianSmooth(repaired, smoothingIterations);

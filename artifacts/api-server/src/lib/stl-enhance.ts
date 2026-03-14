@@ -101,6 +101,101 @@ export function fixNormals(triangles: Triangle[]): Triangle[] {
   });
 }
 
+/**
+ * Smooth only the open boundary edge loops in the mesh — vertices on seams between
+ * separate shells. Interior vertices stay pinned; only boundary loop vertices move
+ * toward their boundary neighbors using Taubin smoothing (λ/μ alternation prevents
+ * the loop from shrinking while still smoothing out jagged zigzag edges).
+ *
+ * This is the right tool for cleaning up the ragged seam lines left by
+ * resolveIntersections — it makes paint boundaries smooth without touching the
+ * rest of the geometry.
+ */
+export function smoothBoundaryLoops(
+  triangles: Triangle[],
+  iterations = 10,
+  lambda = 0.5,
+  mu = -0.53,
+): Triangle[] {
+  if (triangles.length === 0) return triangles;
+
+  // ── 1. Index vertices ─────────────────────────────────────────────────────
+  const keyToIdx = new Map<string, number>();
+  const positions: Vec3[] = [];
+
+  function getOrAdd(v: Vec3): number {
+    const k = vertKey(v);
+    let idx = keyToIdx.get(k);
+    if (idx === undefined) {
+      idx = positions.length;
+      positions.push([v[0], v[1], v[2]]);
+      keyToIdx.set(k, idx);
+    }
+    return idx;
+  }
+
+  const faces: [number, number, number][] = triangles.map((tri) => [
+    getOrAdd(tri.v1), getOrAdd(tri.v2), getOrAdd(tri.v3),
+  ]);
+
+  // ── 2. Find boundary edges (appear in exactly 1 triangle) ────────────────
+  const edgeCount = new Map<string, number>();
+  for (const [a, b, c] of faces) {
+    for (const [p, q] of [[a, b], [b, c], [c, a]] as [number, number][]) {
+      const ek = p < q ? `${p}|${q}` : `${q}|${p}`;
+      edgeCount.set(ek, (edgeCount.get(ek) ?? 0) + 1);
+    }
+  }
+
+  // ── 3. Build boundary adjacency (each boundary vert → its boundary neighbors)
+  const boundaryAdj = new Map<number, Set<number>>();
+  let boundaryEdgeCount = 0;
+  for (const [ek, cnt] of edgeCount) {
+    if (cnt !== 1) continue;
+    boundaryEdgeCount++;
+    const [p, q] = ek.split("|").map(Number);
+    if (!boundaryAdj.has(p)) boundaryAdj.set(p, new Set());
+    if (!boundaryAdj.has(q)) boundaryAdj.set(q, new Set());
+    boundaryAdj.get(p)!.add(q);
+    boundaryAdj.get(q)!.add(p);
+  }
+
+  if (boundaryEdgeCount === 0) return triangles; // closed mesh — nothing to do
+
+  // ── 4. Taubin smoothing on boundary vertices only ─────────────────────────
+  let verts = positions.map((v) => [v[0], v[1], v[2]] as Vec3);
+
+  const step = (factor: number) => {
+    const next = [...verts];
+    for (const [idx, neighbors] of boundaryAdj) {
+      if (neighbors.size < 2) continue; // isolated or tip vertex — skip
+      const cur = verts[idx];
+      let sx = 0, sy = 0, sz = 0;
+      for (const nb of neighbors) {
+        sx += verts[nb][0]; sy += verts[nb][1]; sz += verts[nb][2];
+      }
+      const n = neighbors.size;
+      next[idx] = [
+        cur[0] + factor * (sx / n - cur[0]),
+        cur[1] + factor * (sy / n - cur[1]),
+        cur[2] + factor * (sz / n - cur[2]),
+      ];
+    }
+    verts = next;
+  };
+
+  for (let i = 0; i < iterations; i++) {
+    step(lambda); // smooth
+    step(mu);     // anti-shrink
+  }
+
+  // ── 5. Rebuild triangles with updated positions ───────────────────────────
+  return faces.map(([a, b, c]) => {
+    const v1 = verts[a], v2 = verts[b], v3 = verts[c];
+    return { normal: computeNormal(v1, v2, v3), v1, v2, v3 };
+  });
+}
+
 export function laplacianSmooth(triangles: Triangle[], iterations: number): Triangle[] {
   if (iterations === 0) return triangles;
 

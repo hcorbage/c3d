@@ -66,6 +66,7 @@ export default function Home() {
   const [decimateRatio, setDecimateRatio] = useState(50);
   const [resolveIntersections, setResolveIntersections] = useState(false);
   const [splitShells, setSplitShells] = useState(false);
+  const [smoothSeams, setSmoothSeams] = useState(false);
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
 
   const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0) + (resolveIntersections ? 1 : 0) + (splitShells ? 1 : 0);
@@ -271,6 +272,7 @@ export default function Home() {
         decimateRatio: decimate ? decimateRatio / 100 : undefined,
         resolveIntersections,
         splitShells,
+        smoothSeams,
       }
     });
   };
@@ -790,6 +792,36 @@ export default function Home() {
                   <div className="mt-3 flex items-center gap-2 text-xs text-teal-400 bg-teal-400/10 border border-teal-400/20 rounded-xl px-3 py-2">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                     {t.options.splitShellsHint}
+                  </div>
+                )}
+              </div>
+
+              {/* Smooth Seams */}
+              <div className={`p-4 rounded-2xl border transition-all duration-300 ${smoothSeams ? 'bg-sky-500/10 border-sky-500/30' : 'bg-secondary/40 border-white/5'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-base font-semibold cursor-pointer flex items-center gap-2" htmlFor="smooth-seams">
+                    <svg className="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12c0 0 3-4 6-4s5 8 9 4"/><path d="M3 18c0 0 3-4 6-4s5 8 9 4" strokeOpacity="0.4"/>
+                    </svg>
+                    {t.options.smoothSeams}
+                    <CreditBadge label={t.credits.included} color="gray" />
+                  </Label>
+                  <Switch
+                    id="smooth-seams"
+                    checked={smoothSeams || resolveIntersections}
+                    onCheckedChange={setSmoothSeams}
+                    disabled={resolveIntersections}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {resolveIntersections
+                    ? `${t.options.smoothSeamsDesc} ✓ Auto`
+                    : t.options.smoothSeamsDesc}
+                </p>
+                {stats && stats.openEdges > 0 && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-sky-400 bg-sky-400/10 border border-sky-400/20 rounded-xl px-3 py-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    {t.options.smoothSeamsHint}
                   </div>
                 )}
               </div>
