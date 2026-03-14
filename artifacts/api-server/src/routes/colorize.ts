@@ -15,7 +15,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100
  * and returns a .3mf file ready for BambuLab / PrusaSlicer.
  */
 router.post(
-  "/api/stl/colorize",
+  "/stl/colorize",
   requireAuth,
   upload.single("file"),
   async (req, res) => {

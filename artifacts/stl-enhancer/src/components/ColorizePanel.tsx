@@ -5,87 +5,131 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@workspace/api-client-react/custom-fetch";
 
-// ── K-means color extractor ───────────────────────────────────────────────────
+// ── K-means color extractor (shading-resistant) ───────────────────────────────
 
 function rgbToHex(r: number, g: number, b: number): string {
   return "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
 }
 
-function colorDistance(a: [number, number, number], b: [number, number, number]): number {
-  return Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
+/** Convert RGB (0-255) to HSL (H: 0-360, S: 0-1, L: 0-1) */
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+  else if (max === gn) h = ((bn - rn) / d + 2) / 6;
+  else h = ((rn - gn) / d + 4) / 6;
+  return [h * 360, s, l];
+}
+
+/** Convert HSL back to RGB (0-255) */
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60)        { r = c; g = x; b = 0; }
+  else if (h < 120)  { r = x; g = c; b = 0; }
+  else if (h < 180)  { r = 0; g = c; b = x; }
+  else if (h < 240)  { r = 0; g = x; b = c; }
+  else if (h < 300)  { r = x; g = 0; b = c; }
+  else               { r = c; g = 0; b = x; }
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+/** Hue-aware distance: works in HS space ignoring lightness (shading) */
+function hsDistance(a: [number, number, number], b: [number, number, number]): number {
+  // a/b are [H, S, L] — compare only hue (circular) and saturation
+  const dh = Math.min(Math.abs(a[0] - b[0]), 360 - Math.abs(a[0] - b[0])) / 180; // 0..1
+  const ds = a[1] - b[1]; // 0..1
+  return Math.sqrt(dh * dh * 4 + ds * ds); // weight hue more
 }
 
 function extractDominantColors(imageEl: HTMLImageElement, k = 8): string[] {
-  // Draw to a small canvas for speed
-  const SIZE = 120;
+  const SIZE = 150;
   const canvas = document.createElement("canvas");
-  canvas.width = SIZE;
-  canvas.height = SIZE;
+  canvas.width = SIZE; canvas.height = SIZE;
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(imageEl, 0, 0, SIZE, SIZE);
-
   const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
-  const pixels: [number, number, number][] = [];
+
+  // Collect pixels in HSL; skip transparent, nearly-black, nearly-white, nearly-gray
+  const hslPixels: [number, number, number][] = [];
+  const originalL: number[] = [];
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
     if (a < 128) continue;
-    // Skip near-black (background) and near-white
-    const brightness = (r + g + b) / 3;
-    if (brightness < 40 || brightness > 240) continue;
-    pixels.push([r, g, b]);
+    const [h, s, l] = rgbToHsl(r, g, b);
+    // Skip shadows (too dark), highlights (too bright), and unsaturated (grays)
+    if (l < 0.12 || l > 0.88 || s < 0.08) continue;
+    // Normalize to fixed lightness (0.5) so shading becomes irrelevant for clustering
+    hslPixels.push([h, s, 0.5]);
+    originalL.push(l);
   }
 
-  if (pixels.length === 0) return ["#888888"];
+  if (hslPixels.length === 0) return ["#888888"];
 
-  // Initialize centroids by sampling evenly
-  const step = Math.floor(pixels.length / k);
+  // Initialize k centroids by picking spread-out samples
+  const step = Math.floor(hslPixels.length / k);
   let centroids: [number, number, number][] = Array.from({ length: k }, (_, i) =>
-    [...pixels[i * step]] as [number, number, number],
+    [...hslPixels[Math.min(i * step, hslPixels.length - 1)]] as [number, number, number],
   );
+  const assignments = new Int32Array(hslPixels.length);
 
-  const assignments = new Int32Array(pixels.length);
-
-  for (let iter = 0; iter < 25; iter++) {
-    // Assign each pixel to nearest centroid
+  for (let iter = 0; iter < 30; iter++) {
     let changed = false;
-    for (let pi = 0; pi < pixels.length; pi++) {
-      let best = 0;
-      let bestDist = Infinity;
+    for (let pi = 0; pi < hslPixels.length; pi++) {
+      let best = 0, bestDist = Infinity;
       for (let ci = 0; ci < k; ci++) {
-        const d = colorDistance(pixels[pi], centroids[ci]);
+        const d = hsDistance(hslPixels[pi], centroids[ci]);
         if (d < bestDist) { bestDist = d; best = ci; }
       }
       if (assignments[pi] !== best) { assignments[pi] = best; changed = true; }
     }
     if (!changed) break;
 
-    // Update centroids
-    const sums: [number, number, number][] = Array.from({ length: k }, () => [0, 0, 0]);
-    const counts = new Int32Array(k);
-    for (let pi = 0; pi < pixels.length; pi++) {
-      const c = assignments[pi];
-      sums[c][0] += pixels[pi][0];
-      sums[c][1] += pixels[pi][1];
-      sums[c][2] += pixels[pi][2];
-      counts[c]++;
-    }
+    // Update centroids (hue: circular mean; S: regular mean)
     for (let ci = 0; ci < k; ci++) {
-      if (counts[ci] > 0) {
-        centroids[ci] = [sums[ci][0]/counts[ci], sums[ci][1]/counts[ci], sums[ci][2]/counts[ci]];
+      let sinSum = 0, cosSum = 0, sSum = 0, count = 0;
+      for (let pi = 0; pi < hslPixels.length; pi++) {
+        if (assignments[pi] !== ci) continue;
+        const rad = (hslPixels[pi][0] * Math.PI) / 180;
+        sinSum += Math.sin(rad); cosSum += Math.cos(rad);
+        sSum += hslPixels[pi][1];
+        count++;
+      }
+      if (count > 0) {
+        const hRad = Math.atan2(sinSum / count, cosSum / count);
+        centroids[ci] = [(hRad * 180 / Math.PI + 360) % 360, sSum / count, 0.5];
       }
     }
   }
 
-  // Count cluster sizes
+  // For each cluster, pick median lightness from originals to produce a natural color
   const clusterCounts = new Array(k).fill(0);
-  for (let pi = 0; pi < pixels.length; pi++) clusterCounts[assignments[pi]]++;
+  const clusterLSums = new Array(k).fill(0);
+  for (let pi = 0; pi < hslPixels.length; pi++) {
+    const ci = assignments[pi];
+    clusterCounts[ci]++;
+    clusterLSums[ci] += originalL[pi];
+  }
 
-  // Sort by count descending, filter out tiny clusters
-  const total = pixels.length;
+  const total = hslPixels.length;
   return centroids
-    .map((c, i) => ({ hex: rgbToHex(c[0], c[1], c[2]), count: clusterCounts[i] }))
-    .filter(({ count }) => count / total > 0.02)
+    .map((c, i) => {
+      const count = clusterCounts[i];
+      if (count === 0) return null;
+      // Use median lightness clamped to a pleasant range (40-65%)
+      const medL = Math.min(0.65, Math.max(0.40, clusterLSums[i] / count));
+      const [r, g, b] = hslToRgb(c[0], c[1], medL);
+      return { hex: rgbToHex(r, g, b), count };
+    })
+    .filter((x): x is { hex: string; count: number } => x !== null && x.count / total > 0.025)
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
     .map(({ hex }) => hex);
