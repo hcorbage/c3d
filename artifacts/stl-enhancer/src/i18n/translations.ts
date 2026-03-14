@@ -18,6 +18,8 @@ export const translations = {
       noModel: "No Model Loaded",
       original: "Original",
       enhanced: "Enhanced",
+      awaitingEnhancement: "Awaiting Enhancement",
+      awaitingEnhancementHint: "Process the model to see the result here",
       compareHint: "Drag to rotate · Scroll to zoom",
     },
     stats: {
@@ -151,6 +153,8 @@ export const translations = {
       noModel: "Nenhum Modelo Carregado",
       original: "Original",
       enhanced: "Melhorado",
+      awaitingEnhancement: "Aguardando Melhoria",
+      awaitingEnhancementHint: "Processe o modelo para ver o resultado aqui",
       compareHint: "Arraste para girar · Role para zoom",
     },
     stats: {
