@@ -14,6 +14,7 @@ export const translations = {
     viewer: {
       toggleWireframe: "Toggle Wireframe",
       uploadNew: "Upload New File",
+      clearFile: "Remove File",
       noModel: "No Model Loaded",
       original: "Original",
       enhanced: "Enhanced",
@@ -146,6 +147,7 @@ export const translations = {
     viewer: {
       toggleWireframe: "Alternar Wireframe",
       uploadNew: "Enviar Novo Arquivo",
+      clearFile: "Remover Arquivo",
       noModel: "Nenhum Modelo Carregado",
       original: "Original",
       enhanced: "Melhorado",

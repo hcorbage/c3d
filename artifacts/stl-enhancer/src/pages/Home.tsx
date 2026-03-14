@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Upload, Box, Zap, Settings2, Download, 
+  Upload, Box, Zap, Settings2, Download, Trash2,
   Activity, Info, Layers, Maximize, AlertCircle, CheckCircle2, Eye, EyeOff, ShieldCheck,
   LogIn, LogOut, User, CreditCard, GitMerge, Scissors
 } from "lucide-react";
@@ -207,6 +207,14 @@ export default function Home() {
     maxFiles: 1
   });
 
+  const clearFile = useCallback(() => {
+    setFile(null);
+    setFileUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+    setEnhancedFileUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+    setStats(null);
+    setQualityReport(null);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
@@ -381,6 +389,14 @@ export default function Home() {
                   <input {...getInputProps()} />
                   <Upload className="w-5 h-5" />
                 </button>
+                <button
+                  onClick={clearFile}
+                  className="p-3 rounded-xl bg-background/80 backdrop-blur border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-400 transition-colors text-muted-foreground shadow-lg"
+                  title={t.viewer.clearFile}
+                  disabled={enhanceMutation.isPending}
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
 
               {/* Processing overlay */}
@@ -422,10 +438,7 @@ export default function Home() {
             >
               {/* Controls bar */}
               <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <p className="text-xs font-medium text-green-400">{t.viewer.enhanced}</p>
-                </div>
+                <p className="text-xs text-muted-foreground">{t.viewer.compareHint}</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setIsWireframe(!isWireframe)}
@@ -442,17 +455,48 @@ export default function Home() {
                     <input {...getInputProps()} />
                     <Upload className="w-4 h-4" />
                   </button>
+                  <button
+                    onClick={clearFile}
+                    className="p-2 rounded-xl bg-secondary/60 border border-white/8 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-400 transition-colors text-muted-foreground"
+                    title={t.viewer.clearFile}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
-              {/* Enhanced model only — full width */}
-              <div className="flex-1 glass-panel rounded-2xl overflow-hidden min-h-[400px]">
-                <StlViewer
-                  fileUrl={enhancedFileUrl}
-                  wireframe={isWireframe}
-                  label={t.viewer.enhanced}
-                  labelColor="green"
-                />
+              {/* Side-by-side before / after */}
+              <div className="flex-1 flex gap-3 min-h-[400px]">
+                {/* BEFORE */}
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-400" />
+                    <p className="text-xs font-medium text-blue-400">{t.viewer.original}</p>
+                  </div>
+                  <div className="flex-1 glass-panel rounded-2xl overflow-hidden">
+                    <StlViewer
+                      fileUrl={fileUrl}
+                      wireframe={isWireframe}
+                      label={t.viewer.original}
+                      labelColor="blue"
+                    />
+                  </div>
+                </div>
+                {/* AFTER */}
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <p className="text-xs font-medium text-green-400">{t.viewer.enhanced}</p>
+                  </div>
+                  <div className="flex-1 glass-panel rounded-2xl overflow-hidden">
+                    <StlViewer
+                      fileUrl={enhancedFileUrl}
+                      wireframe={isWireframe}
+                      label={t.viewer.enhanced}
+                      labelColor="green"
+                    />
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
