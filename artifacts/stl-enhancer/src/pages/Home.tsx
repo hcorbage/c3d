@@ -371,75 +371,54 @@ export default function Home() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="flex flex-col gap-2"
             >
-              {/* Always-visible side-by-side panels */}
-              <div className="flex gap-3 h-[430px]">
-
-                {/* LEFT — Original */}
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 px-1">
-                    <span className="w-2 h-2 rounded-full bg-blue-400" />
-                    <p className="text-xs font-medium text-blue-400">{t.viewer.original}</p>
-                  </div>
-                  <div className="flex-1 relative glass-panel rounded-2xl overflow-hidden">
-                    {/* Processing overlay sits on the original panel */}
-                    <AnimatePresence>
-                      {enhanceMutation.isPending && (
-                        <motion.div
-                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm gap-3"
-                        >
-                          <div className="w-10 h-10 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
-                          <div className="text-center">
-                            <p className="text-xs font-semibold text-foreground">{t.actions.processing}</p>
-                            <p className="text-xl font-mono font-bold text-primary mt-0.5">{Math.round(progress)}%</p>
-                          </div>
-                          <div className="w-28 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full transition-[width] duration-150" style={{ width: `${progress}%` }} />
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    <StlViewer fileUrl={fileUrl} wireframe={isWireframe} label={t.viewer.original} labelColor="blue" />
-                  </div>
-                </div>
-
-                {/* RIGHT — Enhanced or awaiting */}
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 px-1">
-                    {enhancedFileUrl ? (
-                      <>
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <p className="text-xs font-medium text-green-400">{t.viewer.enhanced}</p>
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-2 h-2 rounded-full bg-white/20" />
-                        <p className="text-xs font-medium text-muted-foreground">{t.viewer.awaitingEnhancement}</p>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex-1 glass-panel rounded-2xl overflow-hidden">
-                    {enhancedFileUrl ? (
-                      <motion.div
-                        key="enhanced-panel"
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                        transition={{ duration: 0.4 }}
-                        className="h-full"
-                      >
-                        <StlViewer fileUrl={enhancedFileUrl} wireframe={isWireframe} label={t.viewer.enhanced} labelColor="green" />
-                      </motion.div>
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground/30 select-none">
-                        <Zap className="w-12 h-12" />
-                        <p className="text-xs text-center px-8 leading-relaxed">{t.viewer.awaitingEnhancementHint}</p>
+              {/* Single viewer — shows original while waiting, enhanced after processing */}
+              <div className="h-[460px] relative glass-panel rounded-2xl overflow-hidden">
+                {/* Processing overlay */}
+                <AnimatePresence>
+                  {enhanceMutation.isPending && (
+                    <motion.div
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm gap-4"
+                    >
+                      <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-foreground">{t.actions.processing}</p>
+                        <p className="text-2xl font-mono font-bold text-primary mt-1">{Math.round(progress)}%</p>
                       </div>
-                    )}
-                  </div>
-                </div>
+                      <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-[width] duration-150" style={{ width: `${progress}%` }} />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
+                <AnimatePresence mode="wait">
+                  {enhancedFileUrl ? (
+                    <motion.div
+                      key="enhanced"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.35 }}
+                      className="absolute inset-0"
+                    >
+                      <StlViewer fileUrl={enhancedFileUrl} wireframe={isWireframe} labelColor="green" />
+                    </motion.div>
+                  ) : (
+                    <motion.div key="original" className="absolute inset-0">
+                      <StlViewer fileUrl={fileUrl} wireframe={isWireframe} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Status badge top-left */}
+                {enhancedFileUrl && (
+                  <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-500/30 backdrop-blur">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-xs font-medium text-green-400">{t.viewer.enhanced}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Controls bar — always below both panels */}
+              {/* Controls bar below the viewer */}
               <div className="flex items-center justify-between px-1">
                 <p className="text-xs text-muted-foreground">{t.viewer.compareHint}</p>
                 <div className="flex gap-2">
