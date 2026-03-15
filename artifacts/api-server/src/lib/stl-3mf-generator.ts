@@ -166,29 +166,28 @@ function buildModelSettingsConfig(shellCount: number): string {
 }
 
 // ── Shell pre-processing ─────────────────────────────────────────────────────
-// Keep only significant shells. Tiny fragment shells (< 1% of the largest)
-// are dropped entirely — NOT merged into another shell. Merging disconnected
-// geometry causes BambuStudio to report "floating triangles" warnings.
+// Keep all meaningful shells as separate objects in the 3MF.
+// Only degenerate micro-shells (< MIN_TRIANGLES) are dropped.
+// Never merge disconnected shells — that causes "floating triangle" warnings.
 
 const MAX_SHELLS = 16;
-const MIN_SHELL_RATIO = 0.01; // drop shells < 1% size of largest shell
+const MIN_TRIANGLES = 10; // drop only degenerate micro-shells (< 10 triangles)
 
 function preprocessShells(shells: Triangle[][]): Triangle[][] {
   if (shells.length === 0) return shells;
 
   const sorted = [...shells].sort((a, b) => b.length - a.length);
-  const maxLen = sorted[0].length;
-  const threshold = maxLen * MIN_SHELL_RATIO;
 
+  // Keep all shells with at least MIN_TRIANGLES, up to MAX_SHELLS.
+  // Do NOT merge shells — merged disconnected geometry causes "floating
+  // triangle" warnings in slicers. Each shell becomes its own object.
   const significant = sorted.filter(
-    (shell, idx) => shell.length >= threshold && idx < MAX_SHELLS,
+    (shell, idx) => shell.length >= MIN_TRIANGLES && idx < MAX_SHELLS,
   );
 
   const dropped = sorted.length - significant.length;
   if (dropped > 0) {
-    console.log(
-      `[3mf] dropped ${dropped} fragment shell(s) (< ${(MIN_SHELL_RATIO * 100).toFixed(0)}% of main shell)`,
-    );
+    console.log(`[3mf] dropped ${dropped} degenerate micro-shell(s) (< ${MIN_TRIANGLES} triangles)`);
   }
 
   return significant.length > 0 ? significant : [sorted[0]];
