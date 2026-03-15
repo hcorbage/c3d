@@ -41,7 +41,7 @@ export const translations = {
     options: {
       title: "Enhancement Options",
       fillHoles: "Fill Holes",
-      fillHolesDesc: "Detects and closes open boundary edges where geometries meet (e.g. feathers vs vest). Fixes non-manifold edge errors.",
+      fillHolesDesc: "Detects and closes open boundary edges in the mesh. Fixes non-manifold edge errors.",
       fillHolesWarning: "Open mesh detected — enable this option to close the mesh holes.",
       maxHoleSize: "Max hole size to fill",
       edges: "edges",
@@ -211,7 +211,7 @@ export const translations = {
     options: {
       title: "Opções de Melhoria",
       fillHoles: "Fechar Buracos",
-      fillHolesDesc: "Detecta e fecha bordas abertas onde geometrias se encontram (ex: penas vs colete). Resolve erros de \"bordas não múltiplas\".",
+      fillHolesDesc: "Detecta e fecha bordas abertas na malha. Resolve erros de \"bordas não múltiplas\".",
       fillHolesWarning: "Malha aberta detectada — ative esta opção para fechar os buracos da malha.",
       maxHoleSize: "Tamanho máx. do buraco a fechar",
       edges: "arestas",
