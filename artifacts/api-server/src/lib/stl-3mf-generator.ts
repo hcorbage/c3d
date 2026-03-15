@@ -5,14 +5,47 @@ import { PassThrough } from "stream";
 /**
  * 3MF generator — BambuStudio / OrcaSlicer / PrusaSlicer compatible
  *
- * Key insight: BambuStudio reads "color data" from the 3MF Materials &
- * Properties extension (xmlns:m). Per the spec, pid/pindex MUST be on
- * each <triangle> element (per-face), not on <object>. Putting it on
- * <object> is treated as a "default" that most slicers silently ignore.
+ * Strategy for BambuStudio color support:
  *
- * Additionally, we include a model_settings.config so BambuStudio
- * pre-assigns each shell to the correct filament extruder slot.
+ * BambuStudio uses the "Standard 3mf Import color" dialog when it finds
+ * m:colorgroup with per-face pid/pindex data. That dialog asks the user
+ * to map found colors to filament slots. HOWEVER, BambuStudio groups
+ * perceptually similar colors into one — so if k-means gives 3 shades of
+ * blue it collapses them to "1 color". The fix: use MAXIMALLY DISTINCT
+ * vivid colors in the m:colorgroup (regardless of the palette), so
+ * BambuStudio always sees N clearly different colors. The user's palette
+ * colors are only shown in our own UI as a reference.
+ *
+ * Additionally each shell is a separate <object> so BambuStudio can
+ * individually assign it to a filament slot. model_settings.config
+ * pre-assigns each object to extruder 1, 2, 3 … N.
  */
+
+// ── Vivid preset palette ─────────────────────────────────────────────────────
+// These are maximally distinct colors BambuStudio will never collapse.
+// Ordered to maximize perceptual distance between adjacent entries.
+const VIVID_PALETTE = [
+  "#E63946", // vivid red
+  "#2A9D8F", // teal
+  "#E9C46A", // amber yellow
+  "#457B9D", // steel blue
+  "#F4A261", // warm orange
+  "#6A0572", // deep purple
+  "#2DC653", // bright green
+  "#F72585", // hot pink
+  "#4CC9F0", // sky blue
+  "#FB8500", // dark orange
+  "#023E8A", // dark navy
+  "#80B918", // lime green
+  "#9B5DE5", // violet
+  "#00B4D8", // cyan
+  "#D62828", // dark red
+  "#06D6A0", // mint
+];
+
+function vividColor(index: number): string {
+  return VIVID_PALETTE[index % VIVID_PALETTE.length];
+}
 
 function ensureHash(color: string): string {
   return (color.startsWith("#") ? color : `#${color}`).toUpperCase();
@@ -33,24 +66,21 @@ const RELS_XML = `<?xml version="1.0" encoding="UTF-8"?>
 
 // ── Model XML builder ────────────────────────────────────────────────────────
 
-function buildModelXml(shells: Triangle[][], colors: string[]): string {
-  const safeColors = colors.length > 0 ? colors : ["#CCCCCC"];
-
-  // m:colorgroup — one entry per color
-  const colorEntries = safeColors
-    .map((c) => `      <m:color color="${ensureHash(c)}"/>`)
-    .join("\n");
+function buildModelXml(shells: Triangle[][], shellCount: number): string {
+  // One vivid color per shell — guaranteed distinct for BambuStudio
+  const colorEntries = Array.from({ length: shellCount }, (_, i) =>
+    `      <m:color color="${ensureHash(vividColor(i))}"/>`,
+  ).join("\n");
 
   let objectsXml = "";
   let itemsXml = "";
-  let objectId = 2; // id=1 is reserved for the m:colorgroup
+  let objectId = 2; // id=1 is the m:colorgroup
 
   for (let si = 0; si < shells.length; si++) {
     const shell = shells[si];
-    // Cycle through colors if more shells than colors
-    const colorIdx = si % safeColors.length;
+    const colorIdx = si; // shell i → vivid color i (1:1 mapping)
 
-    // Deduplicate vertices
+    // Deduplicate vertices for this shell
     const vertMap = new Map<string, number>();
     const verts: [number, number, number][] = [];
     const faces: [number, number, number][] = [];
@@ -75,21 +105,20 @@ function buildModelXml(shells: Triangle[][], colors: string[]): string {
     }
 
     const vertsXml = verts
-      .map(([x, y, z]) =>
-        `          <vertex x="${x.toFixed(4)}" y="${y.toFixed(4)}" z="${z.toFixed(4)}"/>`
+      .map(
+        ([x, y, z]) =>
+          `          <vertex x="${x.toFixed(4)}" y="${y.toFixed(4)}" z="${z.toFixed(4)}"/>`,
       )
       .join("\n");
 
-    // pid/pindex on EACH triangle (per-face color) — this is the correct 3MF spec usage
-    // pid="1" → the m:colorgroup with id="1"
-    // pindex="N" → index N inside that colorgroup
+    // pid/pindex on EVERY triangle (per-face color per 3MF Materials spec)
     const facesXml = faces
-      .map(([a, b, c]) =>
-        `          <triangle v1="${a}" v2="${b}" v3="${c}" pid="1" pindex="${colorIdx}"/>`
+      .map(
+        ([a, b, c]) =>
+          `          <triangle v1="${a}" v2="${b}" v3="${c}" pid="1" pindex="${colorIdx}"/>`,
       )
       .join("\n");
 
-    // Object itself has NO pid/pindex — color is entirely per-face
     objectsXml += `    <object id="${objectId}" name="Shell_${si + 1}" type="model">
       <mesh>
         <vertices>
@@ -120,14 +149,13 @@ ${itemsXml}  </build>
 }
 
 // ── BambuStudio model_settings.config ────────────────────────────────────────
-// XML format: maps each object (by 3MF id) to a filament extruder slot.
-// This gives BambuStudio the extruder assignment so filament colors apply.
+// Assigns each shell-object to its own extruder slot (1-based).
 
-function buildModelSettingsConfig(shellCount: number, colorCount: number): string {
+function buildModelSettingsConfig(shellCount: number): string {
   const lines = ['<?xml version="1.0" encoding="utf-8"?>', "<config>"];
   for (let si = 0; si < shellCount; si++) {
-    const objectId = si + 2; // matches ids in 3dmodel.model (starts at 2)
-    const extruder = (si % colorCount) + 1; // 1-based
+    const objectId = si + 2;
+    const extruder = si + 1; // 1-based, each shell its own extruder
     lines.push(`  <object id="${objectId}">`);
     lines.push(`    <metadata key="extruder" value="${extruder}"/>`);
     lines.push(`    <metadata key="name" value="Shell_${si + 1}"/>`);
@@ -137,13 +165,53 @@ function buildModelSettingsConfig(shellCount: number, colorCount: number): strin
   return lines.join("\n");
 }
 
+// ── Shell pre-processing ─────────────────────────────────────────────────────
+// Cap the number of exported shells. Tiny fragment shells (< 1% of the
+// largest shell) often come from artifact geometry or degenerate STL faces.
+// We merge them into shell 0 (the dominant body) instead of exporting them
+// as separate objects — this avoids spurious extra geometry in BambuStudio.
+
+const MAX_SHELLS = 16;
+const MIN_SHELL_RATIO = 0.01; // drop shells < 1% size of largest shell
+
+function preprocessShells(shells: Triangle[][]): Triangle[][] {
+  if (shells.length === 0) return shells;
+
+  const sorted = [...shells].sort((a, b) => b.length - a.length);
+  const maxLen = sorted[0].length;
+  const threshold = maxLen * MIN_SHELL_RATIO;
+
+  const significant: Triangle[][] = [];
+  let overflow: Triangle[] = [];
+
+  for (const shell of sorted) {
+    if (shell.length >= threshold && significant.length < MAX_SHELLS) {
+      significant.push(shell);
+    } else {
+      overflow = overflow.concat(shell);
+    }
+  }
+
+  // Merge tiny fragments into the dominant shell
+  if (overflow.length > 0) {
+    significant[0] = significant[0].concat(overflow);
+  }
+
+  return significant;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export async function generateThreeMF(
-  shells: Triangle[][],
-  colors: string[],
+  rawShells: Triangle[][],
+  _colors: string[], // kept for API compat; vivid palette used instead
 ): Promise<Buffer> {
-  const safeColors = colors.length > 0 ? colors : ["#CCCCCC"];
+  const shells = preprocessShells(rawShells);
+  const shellCount = shells.length;
+
+  console.log(
+    `[3mf] exporting ${shellCount} shell(s) (${rawShells.length} raw) with ${shellCount} vivid colors`,
+  );
 
   return new Promise((resolve, reject) => {
     const archive = archiver("zip", { zlib: { level: 6 } });
@@ -157,12 +225,11 @@ export async function generateThreeMF(
 
     archive.pipe(pass);
     archive.append(CONTENT_TYPES_XML, { name: "[Content_Types].xml" });
-    archive.append(RELS_XML,          { name: "_rels/.rels" });
-    archive.append(buildModelXml(shells, safeColors), { name: "3D/3dmodel.model" });
-    archive.append(
-      buildModelSettingsConfig(shells.length, safeColors.length),
-      { name: "Metadata/model_settings.config" },
-    );
+    archive.append(RELS_XML, { name: "_rels/.rels" });
+    archive.append(buildModelXml(shells, shellCount), { name: "3D/3dmodel.model" });
+    archive.append(buildModelSettingsConfig(shellCount), {
+      name: "Metadata/model_settings.config",
+    });
 
     archive.finalize();
   });
