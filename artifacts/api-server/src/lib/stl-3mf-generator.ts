@@ -166,10 +166,9 @@ function buildModelSettingsConfig(shellCount: number): string {
 }
 
 // ── Shell pre-processing ─────────────────────────────────────────────────────
-// Cap the number of exported shells. Tiny fragment shells (< 1% of the
-// largest shell) often come from artifact geometry or degenerate STL faces.
-// We merge them into shell 0 (the dominant body) instead of exporting them
-// as separate objects — this avoids spurious extra geometry in BambuStudio.
+// Keep only significant shells. Tiny fragment shells (< 1% of the largest)
+// are dropped entirely — NOT merged into another shell. Merging disconnected
+// geometry causes BambuStudio to report "floating triangles" warnings.
 
 const MAX_SHELLS = 16;
 const MIN_SHELL_RATIO = 0.01; // drop shells < 1% size of largest shell
@@ -181,23 +180,18 @@ function preprocessShells(shells: Triangle[][]): Triangle[][] {
   const maxLen = sorted[0].length;
   const threshold = maxLen * MIN_SHELL_RATIO;
 
-  const significant: Triangle[][] = [];
-  let overflow: Triangle[] = [];
+  const significant = sorted.filter(
+    (shell, idx) => shell.length >= threshold && idx < MAX_SHELLS,
+  );
 
-  for (const shell of sorted) {
-    if (shell.length >= threshold && significant.length < MAX_SHELLS) {
-      significant.push(shell);
-    } else {
-      overflow = overflow.concat(shell);
-    }
+  const dropped = sorted.length - significant.length;
+  if (dropped > 0) {
+    console.log(
+      `[3mf] dropped ${dropped} fragment shell(s) (< ${(MIN_SHELL_RATIO * 100).toFixed(0)}% of main shell)`,
+    );
   }
 
-  // Merge tiny fragments into the dominant shell
-  if (overflow.length > 0) {
-    significant[0] = significant[0].concat(overflow);
-  }
-
-  return significant;
+  return significant.length > 0 ? significant : [sorted[0]];
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
