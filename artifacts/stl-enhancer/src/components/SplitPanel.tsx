@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { Scissors, Download, Loader2, Info, Grid3x3, Maximize2, SlidersHorizontal } from "lucide-react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
-import { customFetch } from "@workspace/api-client-react/custom-fetch";
 
 // ── Printer presets ──────────────────────────────────────────────────────────
 
@@ -180,9 +179,11 @@ export function SplitPanel({ file }: SplitPanelProps) {
         if (numTZ > 0) fd.append("targetZ", String(numTZ));
       }
 
-      const res = await customFetch("/api/stl/split", {
+      const token = localStorage.getItem("c3d_auth_token");
+      const res = await fetch("/api/stl/split", {
         method: "POST",
         body: fd,
+        headers: token ? { authorization: `Bearer ${token}` } : undefined,
       });
 
       if (!res.ok) {
