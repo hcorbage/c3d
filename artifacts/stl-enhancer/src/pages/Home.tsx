@@ -11,6 +11,7 @@ import type { StlStats, QualityReport } from "@workspace/api-client-react";
 import { StlViewer } from "@/components/StlViewer";
 import { QualityReportPanel } from "@/components/QualityReportPanel";
 import { ColorizePanel } from "@/components/ColorizePanel";
+import { SplitPanel } from "@/components/SplitPanel";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -73,7 +74,7 @@ export default function Home() {
 
   const totalCredits = 1 + (mergeShells ? 1 : 0) + (decimate ? 1 : 0) + (resolveIntersections ? 1 : 0) + (splitShells ? 1 : 0);
 
-  const [appMode, setAppMode] = useState<"enhance" | "colorize">("enhance");
+  const [appMode, setAppMode] = useState<"enhance" | "colorize" | "split">("enhance");
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -585,6 +586,14 @@ export default function Home() {
                 <Palette className="w-4 h-4" />
                 {t.colorize.tabLabel}
               </button>
+              <button
+                onClick={() => setAppMode("split")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+                  ${appMode === "split" ? "bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-md" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Scissors className="w-4 h-4" />
+                {t.split.tabLabel}
+              </button>
             </div>
 
             {appMode === "colorize" && (
@@ -592,6 +601,9 @@ export default function Home() {
                 user={user}
                 onNeedLogin={() => { setAuthMode("login"); setShowAuthModal(true); }}
               />
+            )}
+            {appMode === "split" && (
+              <SplitPanel file={file} />
             )}
             {appMode === "enhance" && (<>
             <div className="space-y-8 flex-1">
